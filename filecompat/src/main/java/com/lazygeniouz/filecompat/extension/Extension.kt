@@ -1,17 +1,18 @@
 package com.lazygeniouz.filecompat.extension
 
-import android.database.Cursor
-import com.lazygeniouz.filecompat.file.BaseFileCompat.FileCompat
-import com.lazygeniouz.filecompat.file.BaseFileCompat.RealSerializableFileCompat
+import android.net.Uri
+import com.lazygeniouz.filecompat.file.DocumentFileCompat
+import com.lazygeniouz.filecompat.file.SerializableDocumentFile
+import java.io.File
 
 /**
  * If you need a [Serializable] list, this extension should be used.
  *
- * Converts the existing [FileCompat] to [RealSerializableFileCompat].
+ * Converts the existing [DocumentFileCompat] to [SerializableDocumentFile].
  */
-fun Collection<FileCompat>.toSerializable()
-        : ArrayList<RealSerializableFileCompat> {
-    val serializedList = arrayListOf<RealSerializableFileCompat>()
+fun Collection<DocumentFileCompat>.toSerializable()
+        : ArrayList<SerializableDocumentFile> {
+    val serializedList = arrayListOf<SerializableDocumentFile>()
     this.forEach { file -> serializedList.add(file.toSerializable()) }
     return serializedList
 }
@@ -19,21 +20,44 @@ fun Collection<FileCompat>.toSerializable()
 /**
  * Equivalent of **DocumentFile.findFile**, but faster!
  *
- * Can be null if not file found with passed predicate.
- *
  * @param name Name of the File to find
+ *
+ * @return A Nullable FileCompat object.
  */
-fun Collection<FileCompat>.findFile(name: String): FileCompat? {
-    return this.firstOrNull() { file -> file.uri.isNotEmpty() && file.uri == name }
+fun Collection<DocumentFileCompat>.findFile(name: String): DocumentFileCompat? {
+    return this.firstOrNull() { file -> file.name.isNotEmpty() && file.name == name }
 }
 
 /**
- * Find a File whose name contains some characters
+ * Find a File whose Uri contains searched characters.
  *
- * Can be null if not file found with passed predicate.
+ * This explicitly checks against the Document's **Uri**.
+ *
+ * If you want to check against the Document's **Name**, use `Collection<FileCompat>.findFile`.
  *
  * @param name Name of the File to find
+ *
+ * @return A Nullable FileCompat object.
  */
-fun Collection<FileCompat>.findFileThatContains(name: String): FileCompat? {
-    return this.firstOrNull() { file -> file.uri.isNotEmpty() && file.uri.contains(name) }
+fun Collection<DocumentFileCompat>.findFileThatContainsUri(name: String): DocumentFileCompat? {
+    return this.firstOrNull() { file ->
+        file.uri.isNotEmpty() && file.uri.contains(
+            name
+        )
+    }
+}
+
+/**
+ * [String] to [Uri], nothing fancy here.
+ */
+internal fun String.toUri(): Uri {
+    return Uri.parse(this)
+}
+
+
+/**
+ * [String] to [File], nothing fancy here.
+ */
+internal fun String.toFile(): File {
+    return File(this)
 }
