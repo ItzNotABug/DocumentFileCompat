@@ -1,5 +1,6 @@
 package com.lazygeniouz.filecompat.example
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -20,7 +21,9 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity(R.layout.activity_main) {
 
-    private lateinit var button: Button
+    private lateinit var buttonDir: Button
+    private lateinit var buttonFile: Button
+
     private lateinit var textView: TextView
     private lateinit var progress: ProgressBar
 
@@ -29,17 +32,44 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
             if (result.resultCode == Activity.RESULT_OK) {
                 val documentUri = result.data?.data
                 if (documentUri != null) {
+                    textView.text = ""
+
                     lifecycleScope.launch {
                         progress.isVisible = true
+                        buttonDir.isVisible = false
+                        buttonFile.isVisible = false
                         val performanceResult = withContext(Dispatchers.IO) {
-                            Performance.calculatePerformance(
+                            Performance.calculateDirectoryPerformance(
                                 this@MainActivity, documentUri
                             )
                         }
 
                         progress.isVisible = false
+                        buttonDir.isVisible = true
+                        buttonFile.isVisible = true
                         textView.text = performanceResult
-                        button.isVisible = true
+                    }
+                }
+            }
+        }
+
+
+    @SuppressLint("SetTextI18n")
+    private val fileResultLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val documentUri = result.data?.data
+                if (documentUri != null) {
+                    textView.text = ""
+
+                    lifecycleScope.launch {
+                        val performance = withContext(Dispatchers.IO) {
+                            Performance.calculateFilesPerformance(
+                                this@MainActivity, documentUri
+                            )
+                        }
+
+                        textView.text = performance
                     }
                 }
             }
@@ -49,22 +79,30 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        button = findViewById(R.id.button)
+        buttonDir = findViewById(R.id.buttonDir)
+        buttonFile = findViewById(R.id.buttonFile)
         textView = findViewById(R.id.fileNames)
         progress = findViewById(R.id.progress)
 
-        button.isVisible = true
-        button.setOnClickListener {
-            button.isVisible = false
+        buttonDir.isVisible = true
+        buttonFile.isVisible = true
+
+        buttonDir.setOnClickListener {
             folderResultLauncher.launch(getStorageIntent())
+        }
+
+        buttonFile.setOnClickListener {
+            fileResultLauncher.launch(getStorageIntent(true))
         }
     }
 
-    private fun getStorageIntent(): Intent {
-        return if (SDK_INT >= 30) {
-            val storageManager = getSystemService(Context.STORAGE_SERVICE) as StorageManager
-            storageManager.primaryStorageVolume.createOpenDocumentTreeIntent()
-        } else Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+    private fun getStorageIntent(single: Boolean = false): Intent {
+        return if (single) Intent(Intent.ACTION_GET_CONTENT).setType("*/*") else {
+            if (SDK_INT >= 30) {
+                val storageManager = getSystemService(Context.STORAGE_SERVICE) as StorageManager
+                storageManager.primaryStorageVolume.createOpenDocumentTreeIntent()
+            } else Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        }
     }
 
     override fun onBackPressed() {

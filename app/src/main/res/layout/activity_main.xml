@@ -19,14 +19,25 @@
         android:visibility="gone" />
 
     <Button
-        android:id="@+id/button"
+        android:id="@+id/buttonDir"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_below="@id/fileNames"
         android:layout_centerHorizontal="true"
-        android:paddingVertical="12dp"
         android:layout_marginVertical="12dp"
+        android:paddingVertical="12dp"
         android:text="Select Directory"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/buttonFile"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/buttonDir"
+        android:layout_centerHorizontal="true"
+        android:layout_marginVertical="12dp"
+        android:paddingVertical="12dp"
+        android:text="Select a File"
         android:visibility="gone" />
 
 </RelativeLayout>
