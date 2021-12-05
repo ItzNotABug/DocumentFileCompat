@@ -26,7 +26,7 @@ Check the screenshots below:
 **48 whopping seconds for directory listing compared to 3.5!** (Obviously, No competition with the
 Native File API).\
 Also extracting file information does not take that much time but the improvement is still
-significant.\
+significant.
 
 **Note:** `DocumentFileCompat` is something that I used internally for some projects & therefore I
 didn't do much of file manipulation with it (only delete files) <strike>and therefore this API does
