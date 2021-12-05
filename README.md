@@ -7,8 +7,7 @@ A faster alternative to AndroidX's DocumentFile.
 It is horribly slow!\
 For **almost** every method, there is a query to **ContentResolver**.
 
-The most common one is `DocumentFile.findFile()`, `DocumentFile.getName()` and other is\
-building a Custom Data Model with multiple parameters.\
+The most common one is `DocumentFile.findFile()`, `DocumentFile.getName()` and other is building a Custom Data Model with multiple parameters.\
 This can take like a horrible amount of time.
 
 ### Solution
