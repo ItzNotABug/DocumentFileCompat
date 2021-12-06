@@ -20,7 +20,7 @@ internal class TreeDocumentFileCompat constructor(
     lastModifiedTime: Long = -1L, documentMimeType: String = "", documentFlags: Int = -1,
 ) : DocumentFileCompat(
     context, documentUri, documentName, documentSize,
-    lastModifiedTime, documentMimeType, documentFlags
+    lastModifiedTime, documentFlags, documentMimeType
 ) {
 
     /**

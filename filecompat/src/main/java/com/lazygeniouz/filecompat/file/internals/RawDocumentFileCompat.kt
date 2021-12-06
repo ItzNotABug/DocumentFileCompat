@@ -16,7 +16,7 @@ internal class RawDocumentFileCompat constructor(
     lastModifiedTime: Long = -1L, documentMimeType: String = "", documentFlags: Int = -1,
 ) : DocumentFileCompat(
     null, documentUri, documentName, documentSize,
-    lastModifiedTime, documentMimeType, documentFlags
+    lastModifiedTime, documentFlags, documentMimeType
 ) {
 
     var file: File = documentUri.toFile()

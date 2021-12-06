@@ -1,4 +1,4 @@
-package com.lazygeniouz.filecompat.provider
+package com.lazygeniouz.filecompat.controller
 
 import android.content.ContentResolver
 import android.content.Context
@@ -19,7 +19,7 @@ import com.lazygeniouz.filecompat.resolver.ResolverCompat
  * @param context Required for queries to [ContentResolver]
  * @param fileCompat For accessing FileCompat data
  */
-class DocumentController(
+internal class DocumentController(
     private val context: Context,
     private val fileCompat: DocumentFileCompat
 ) {
@@ -31,22 +31,6 @@ class DocumentController(
 
     // File Handler to call delegate functions.
     private val resolverCompat by lazy { ResolverCompat(context, uri) }
-
-    // Returns the document name.
-    internal val name: String
-        get() = fileCompat.name
-
-    // Returns the document extension.
-    internal val extension: String
-        get() = fileCompat.extension
-
-    // Returns the document's last modified time in milliseconds.
-    internal val lastModified: Long
-        get() = fileCompat.lastModified
-
-    // Returns the size of the document.
-    internal val length: Long
-        get() = fileCompat.length
 
     /**
      * This will return a list of [DocumentFileCompat] with all the defined fields.

@@ -4,11 +4,10 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract.isDocumentUri
-import androidx.annotation.NonNull
+import com.lazygeniouz.filecompat.controller.DocumentController
 import com.lazygeniouz.filecompat.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.filecompat.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.filecompat.file.internals.TreeDocumentFileCompat
-import com.lazygeniouz.filecompat.provider.DocumentController
 import com.lazygeniouz.filecompat.resolver.ResolverCompat
 import java.io.File
 
@@ -19,18 +18,18 @@ import java.io.File
  * Use [DocumentFileCompat.toSerializable] for a [Serializable] object.
  * @see com.lazygeniouz.filecompat.extension.toSerializable
  */
-abstract class DocumentFileCompat constructor(
+abstract class DocumentFileCompat(
     internal val context: Context?,
     val uri: String,
     val name: String = "",
-    private val size: Long = 0,
+    open val length: Long = 0,
     val lastModified: Long = -1L,
-    internal val documentMimeType: String = "",
-    internal val documentFlags: Int = -1
+    internal val documentFlags: Int = -1,
+    internal val documentMimeType: String = ""
 ) {
 
     /**
-     * Context is asserted as [NonNull] here because it is only required
+     * Context is asserted as **NonNull** here because it is only required
      * by the [DocumentController] which is initialized **lazily** & would
      * never be initialized in the [RawDocumentFileCompat] as it uses the [File] api completely.
      */
@@ -62,17 +61,10 @@ abstract class DocumentFileCompat constructor(
     abstract fun listFiles(): List<DocumentFileCompat>
 
     /**
-     * Returns the size of the File.
-     */
-    open val length: Long
-        get() = size
-
-    /**
      * Get the extension of the Document **File**.
      */
     open val extension: String
         get() = name.substring(name.lastIndexOf("."))
-
 
     /**
      * Delete the file.

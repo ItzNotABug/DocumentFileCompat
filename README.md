@@ -7,7 +7,8 @@ A faster alternative to AndroidX's DocumentFile.
 It is horribly slow!\
 For **almost** every method, there is a query to **ContentResolver**.
 
-The most common one is `DocumentFile.findFile()`, `DocumentFile.getName()` and other is building a Custom Data Model with multiple parameters.\
+The most common one is `DocumentFile.findFile()`, `DocumentFile.getName()` and other is building a
+Custom Data Model with multiple parameters.\
 This can take like a horrible amount of time.
 
 ### Solution
@@ -32,7 +33,33 @@ didn't do much of file manipulation with it (only delete files) <strike>and ther
 not offer too much out of the box</strike>.\
 This is now a completely usable alternative to `DocumentFile`.
 
-Reference:
+### Installation
+
+#### Gradle
+
+```gradle
+dependencies {
+    implementation "com.lazygeniouz:documentfile_compat:$latest_version"
+}
+```
+
+#### Maven
+
+```maven
+<dependency>
+  <groupId>com.lazygeniouz</groupId>
+  <artifactId>documentfile_compat</artifactId>
+  <version>$latest_version</version>
+  <type>aar</type>
+</dependency>
+```
+
+### Usage
+
+Almost all of the methods & getters are identical to `DocumentFile`, you'll just have to replace the
+imports.
+
+#### Reference:
 
 1. https://stackoverflow.com/a/42187419/6819340
 2. https://stackoverflow.com/a/63466997/6819340
