@@ -1,7 +1,5 @@
 package com.lazygeniouz.filecompat.file
 
-import android.net.Uri
-import com.lazygeniouz.filecompat.extension.toUri
 import java.io.Serializable
 
 /**
@@ -9,7 +7,7 @@ import java.io.Serializable
  * without creating your own Models as this only holds references to Primitive types.
  */
 class SerializedFile private constructor(
-    val uri: Uri, val name: String,
+    val uri: String, val name: String,
     val length: Long, val lastModified: Long,
     val mimeType: String, val flags: Int
 ) : Serializable {
@@ -29,7 +27,7 @@ class SerializedFile private constructor(
         internal fun from(file: DocumentFileCompat): SerializedFile {
             file.apply {
                 return SerializedFile(
-                    uri.toUri(), name, length,
+                    uri, name, length,
                     lastModified, documentMimeType, documentFlags
                 )
             }
