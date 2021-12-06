@@ -84,9 +84,6 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
         textView = findViewById(R.id.fileNames)
         progress = findViewById(R.id.progress)
 
-        buttonDir.isVisible = true
-        buttonFile.isVisible = true
-
         buttonDir.setOnClickListener {
             folderResultLauncher.launch(getStorageIntent())
         }
