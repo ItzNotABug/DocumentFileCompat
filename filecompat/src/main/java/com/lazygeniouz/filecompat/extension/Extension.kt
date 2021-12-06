@@ -2,18 +2,18 @@ package com.lazygeniouz.filecompat.extension
 
 import android.net.Uri
 import com.lazygeniouz.filecompat.file.DocumentFileCompat
-import com.lazygeniouz.filecompat.file.SerializableDocumentFile
+import com.lazygeniouz.filecompat.file.SerializedFile
 import java.io.File
 
 /**
  * If you need a [Serializable] list, this extension should be used.
  *
- * Converts the existing [DocumentFileCompat] to [SerializableDocumentFile].
+ * Converts the existing [DocumentFileCompat] to [SerializedFile].
  */
-fun Collection<DocumentFileCompat>.toSerializable()
-        : ArrayList<SerializableDocumentFile> {
-    val serializedList = arrayListOf<SerializableDocumentFile>()
-    this.forEach { file -> serializedList.add(file.toSerializable()) }
+fun Collection<DocumentFileCompat>.toSerializedList()
+        : ArrayList<SerializedFile> {
+    val serializedList = arrayListOf<SerializedFile>()
+    this.forEach { file -> serializedList.add(file.serialize()) }
     return serializedList
 }
 

@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract.isDocumentUri
 import com.lazygeniouz.filecompat.controller.DocumentController
+import com.lazygeniouz.filecompat.extension.toSerializedList
 import com.lazygeniouz.filecompat.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.filecompat.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.filecompat.file.internals.TreeDocumentFileCompat
@@ -15,8 +16,7 @@ import java.io.File
  * This cannot be used as a Serializable
  * because this class holds a reference to [Context].
  *
- * Use [DocumentFileCompat.toSerializable] for a [Serializable] object.
- * @see com.lazygeniouz.filecompat.extension.toSerializable
+ * Use [DocumentFileCompat.serialize] for a [Serializable] object.
  */
 abstract class DocumentFileCompat(
     internal val context: Context?,
@@ -64,7 +64,7 @@ abstract class DocumentFileCompat(
      * Get the extension of the Document **File**.
      */
     open val extension: String
-        get() = name.substring(name.lastIndexOf("."))
+        get() = name.substringAfterLast('.', "")
 
     /**
      * Delete the file.
@@ -130,12 +130,13 @@ abstract class DocumentFileCompat(
     }
 
     /**
-     * Converts a non serializable [DocumentFileCompat] to a serializable [SerializableDocumentFile].
+     * Converts a non serializable [DocumentFileCompat] to a serializable [SerializedFile].
      *
-     * @see com.lazygeniouz.filecompat.extension.toSerializable
+     * To convert a list of [DocumentFileCompat] to a list of [Serializable],
+     * use [toSerializedList] on a `List<DocumentFileCompat>`
      */
-    fun toSerializable(): SerializableDocumentFile {
-        return SerializableDocumentFile.fromFileCompat(this)
+    fun serialize(): SerializedFile {
+        return SerializedFile.from(this)
     }
 
     companion object {
