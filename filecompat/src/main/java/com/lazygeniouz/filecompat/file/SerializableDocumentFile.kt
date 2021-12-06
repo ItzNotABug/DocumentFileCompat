@@ -1,15 +1,16 @@
 package com.lazygeniouz.filecompat.file
 
+import java.io.Serializable
+
 /**
  * This can be used as a [Serializable] object to pass around
  * without creating your own Models as this only holds references to Primitive types.
- *
  */
 class SerializableDocumentFile private constructor(
     val documentUri: String, val documentName: String,
     val documentSize: Long, val lastModifiedTime: Long,
     val documentMimeType: String, val documentFlags: Int
-) {
+) : Serializable {
 
     companion object {
 
