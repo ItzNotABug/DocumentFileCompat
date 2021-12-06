@@ -22,7 +22,7 @@ class SerializedFile private constructor(
          * This is sort of a **Read Only** object.
          *
          * @param file [DocumentFileCompat] object for copying primitive data types.
-         * @return A Serializable **BaseFileCompat** object.
+         * @return A Serializable object.
          */
         internal fun from(file: DocumentFileCompat): SerializedFile {
             file.apply {
