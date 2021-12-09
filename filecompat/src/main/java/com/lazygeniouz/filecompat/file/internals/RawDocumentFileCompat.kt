@@ -1,12 +1,13 @@
 package com.lazygeniouz.filecompat.file.internals
 
+import android.net.Uri
 import android.webkit.MimeTypeMap
-import com.lazygeniouz.filecompat.extension.toFile
+import com.lazygeniouz.filecompat.extension.findFile
 import com.lazygeniouz.filecompat.file.DocumentFileCompat
 import java.io.File
 
 /**
- * RawFileCompat serves as an alternative to the **RawDocumentFile**
+ * RawDocumentFileCompat serves as an alternative to the **RawDocumentFile**
  * which handles Documents using the native [File] api.
  *
  * Other params same as [DocumentFileCompat] except there's no Context here.
@@ -19,7 +20,16 @@ internal class RawDocumentFileCompat constructor(
     lastModifiedTime, documentFlags, documentMimeType
 ) {
 
-    var file: File = documentUri.toFile()
+    var file: File = File(documentUri)
+
+    /**
+     * Returns a [Uri] via [Uri.fromFile] but
+     * if you want to use the **FileProvider** api to get a Uri,
+     * you should convert this Uri to a File, make your checks if necessary &
+     * then use **FileProvider.getUriForFile**.
+     */
+    override val uri: Uri
+        get() = Uri.fromFile(file)
 
     // Get file extension.
     override val extension: String
@@ -32,8 +42,8 @@ internal class RawDocumentFileCompat constructor(
     /**
      * Delete the file & return the result.
      *
-     * Note it will delete the everything if this is a folder as this uses `deleteRecursively`.
-     *
+     * Note it will delete the everything if this is a folder
+     * because this uses Kotlin extension [File.deleteRecursively].
      */
     override fun delete(): Boolean {
         return file.deleteRecursively()
@@ -94,7 +104,7 @@ internal class RawDocumentFileCompat constructor(
             else null
 
         } catch (exception: Exception) {
-            println("FileCompat: Exception while creating a document = ${exception.message}")
+            println("DocumentFileCompat: Exception while creating a document = ${exception.message}")
             null
         }
     }
@@ -110,12 +120,17 @@ internal class RawDocumentFileCompat constructor(
     // Performance of Files api is pretty great as compared to others.
     override fun listFiles(): List<DocumentFileCompat> {
         val filesList = arrayListOf<DocumentFileCompat>()
-        file.listFiles()?.forEach { child -> filesList.add(fromFile(child)) }
+        file.listFiles()?.onEach { child -> filesList.add(fromFile(child)) }
         return filesList
     }
 
-    companion object {
-        fun getMimeType(file: File): String {
+    // Return a file if exists, else **null**
+    override fun findFile(name: String): DocumentFileCompat? {
+        return listFiles().findFile(name)
+    }
+
+    internal companion object {
+        internal fun getMimeType(file: File): String {
             if (file.isDirectory) return ""
 
             val mimeType = MimeTypeMap

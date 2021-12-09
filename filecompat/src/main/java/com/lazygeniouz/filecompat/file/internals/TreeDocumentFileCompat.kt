@@ -2,7 +2,7 @@ package com.lazygeniouz.filecompat.file.internals
 
 import android.content.Context
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
-import com.lazygeniouz.filecompat.extension.toUri
+import com.lazygeniouz.filecompat.extension.findFile
 import com.lazygeniouz.filecompat.file.DocumentFileCompat
 
 /**
@@ -30,7 +30,7 @@ internal class TreeDocumentFileCompat constructor(
         context: Context,
         fileCompat: DocumentFileCompat,
     ) : this(
-        context, fileCompat.uri,
+        context, fileCompat.path,
         fileCompat.name, fileCompat.length,
         fileCompat.lastModified, fileCompat.documentMimeType, fileCompat.documentFlags
     )
@@ -44,8 +44,8 @@ internal class TreeDocumentFileCompat constructor(
      * @return A FileCompat object if file was created successfully, **null** otherwise.
      */
     override fun createFile(mimeType: String, name: String): DocumentFileCompat? {
-        val treeFileUri = fileController.createFile(mimeType, name).toString()
-        return fromTreeUri(context!!, treeFileUri.toUri())
+        val treeFileUri = fileController.createFile(mimeType, name)
+        return treeFileUri?.let { fromTreeUri(context!!, treeFileUri) }
     }
 
     /**
@@ -56,8 +56,8 @@ internal class TreeDocumentFileCompat constructor(
      * @return A FileCompat object if directory was created successfully, **null** otherwise.
      */
     override fun createDirectory(name: String): DocumentFileCompat? {
-        val treeFileUri = fileController.createFile(MIME_TYPE_DIR, name).toString()
-        return fromTreeUri(context!!, treeFileUri.toUri())
+        val treeFileUri = fileController.createFile(MIME_TYPE_DIR, name)
+        return treeFileUri?.let { fromTreeUri(context!!, treeFileUri) }
     }
 
     /**
@@ -65,5 +65,12 @@ internal class TreeDocumentFileCompat constructor(
      */
     override fun listFiles(): List<DocumentFileCompat> {
         return fileController.listFiles()
+    }
+
+    /**
+     * Return a file if exists, else **null**.
+     */
+    override fun findFile(name: String): DocumentFileCompat? {
+        return listFiles().findFile(name)
     }
 }

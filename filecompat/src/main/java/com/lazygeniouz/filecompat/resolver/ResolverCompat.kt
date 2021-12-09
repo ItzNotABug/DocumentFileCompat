@@ -11,7 +11,7 @@ import com.lazygeniouz.filecompat.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.filecompat.file.internals.TreeDocumentFileCompat
 
 /**
- * This class call relevant queries on the [ContentResolver]
+ * This class calls relevant queries on the [ContentResolver]
  *
  * @param context Required to access the underlying **ContentResolver**
  */
@@ -20,7 +20,7 @@ internal class ResolverCompat(
     private val uri: Uri
 ) {
 
-    private val tag = "FileCompat"
+    private val tag = "DocumentFileCompat"
 
     // Projections
     private val _idProjection = COLUMN_DOCUMENT_ID
@@ -123,10 +123,7 @@ internal class ResolverCompat(
      */
     internal fun exists(): Boolean {
         var exists = false
-        contentResolver.query(
-            uri, documentIdProjection,
-            null, null, null
-        )?.let { cursor ->
+        getCursor(uri, documentIdProjection)?.let { cursor ->
             exists = try {
                 cursor.count > 0
             } catch (exception: Exception) {
@@ -138,10 +135,10 @@ internal class ResolverCompat(
         return exists
     }
 
-    // Get a Cursor to query the given Uri against fullProjection
-    private fun getCursor(uri: Uri): Cursor? {
+    // Get a Cursor to query the given Uri against provided projection
+    private fun getCursor(uri: Uri, projection: Array<String>): Cursor? {
         return contentResolver.query(
-            uri, fullProjection,
+            uri, projection,
             null, null, null
         )
     }
@@ -157,25 +154,23 @@ internal class ResolverCompat(
 
         var singleDocument: DocumentFileCompat? = null
 
-        getCursor(uriToUse)?.let { cursor ->
-            cursor.use {
-                if (cursor.moveToFirst()) {
-                    val documentId: String = cursor.getString(0)
-                    val documentUri: Uri = if (!isTree) uri
-                    else buildDocumentUriUsingTree(getTreeUri(uri), documentId)
+        getCursor(uriToUse, fullProjection)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val documentId: String = cursor.getString(0)
+                val documentUri: Uri = if (!isTree) uri
+                else buildDocumentUriUsingTree(getTreeUri(uri), documentId)
 
-                    val documentName: String = cursor.getString(1)
-                    val documentSize: Long = cursor.getLong(2)
-                    val documentLastModified: Long = cursor.getLong(3)
-                    val documentMimeType: String = cursor.getString(4)
-                    val documentFlags: Int = cursor.getLong(5).toInt()
-                    singleDocument = SingleDocumentFileCompat(
-                        context, documentUri.toString(),
-                        documentName, documentSize,
-                        documentLastModified,
-                        documentMimeType, documentFlags
-                    )
-                }
+                val documentName: String = cursor.getString(1)
+                val documentSize: Long = cursor.getLong(2)
+                val documentLastModified: Long = cursor.getLong(3)
+                val documentMimeType: String = cursor.getString(4)
+                val documentFlags: Int = cursor.getLong(5).toInt()
+                singleDocument = SingleDocumentFileCompat(
+                    context, documentUri.toString(),
+                    documentName, documentSize,
+                    documentLastModified,
+                    documentMimeType, documentFlags
+                )
             }
         }
 
@@ -195,27 +190,25 @@ internal class ResolverCompat(
         // empty list
         val listOfDocuments = arrayListOf<DocumentFileCompat>()
 
-        getCursor(childrenUri)?.let { cursor ->
-            cursor.use {
-                while (cursor.moveToNext()) {
-                    val documentId: String = cursor.getString(0)
-                    val documentUri: Uri = buildDocumentUriUsingTree(
-                        getTreeUri(uri), documentId
-                    )
+        getCursor(childrenUri, fullProjection)?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val documentId: String = cursor.getString(0)
+                val documentUri: Uri = buildDocumentUriUsingTree(
+                    getTreeUri(uri), documentId
+                )
 
-                    val documentName: String = cursor.getString(1)
-                    val documentSize: Long = cursor.getLong(2)
-                    val documentLastModified: Long = cursor.getLong(3)
-                    val documentMimeType: String = cursor.getString(4)
-                    val documentFlags: Int = cursor.getLong(5).toInt()
-                    listOfDocuments.add(
-                        TreeDocumentFileCompat(
-                            context, documentUri.toString(),
-                            documentName, documentSize,
-                            documentLastModified, documentMimeType, documentFlags
-                        )
+                val documentName: String = cursor.getString(1)
+                val documentSize: Long = cursor.getLong(2)
+                val documentLastModified: Long = cursor.getLong(3)
+                val documentMimeType: String = cursor.getString(4)
+                val documentFlags: Int = cursor.getLong(5).toInt()
+                listOfDocuments.add(
+                    TreeDocumentFileCompat(
+                        context, documentUri.toString(),
+                        documentName, documentSize,
+                        documentLastModified, documentMimeType, documentFlags
                     )
-                }
+                )
             }
         }
 

@@ -3,7 +3,6 @@ package com.lazygeniouz.filecompat.extension
 import android.net.Uri
 import com.lazygeniouz.filecompat.file.DocumentFileCompat
 import com.lazygeniouz.filecompat.file.SerializedFile
-import java.io.File
 
 /**
  * If you need a [Serializable] list, this extension should be used.
@@ -40,11 +39,7 @@ fun Collection<DocumentFileCompat>.findFile(name: String): DocumentFileCompat? {
  * @return A Nullable FileCompat object.
  */
 fun Collection<DocumentFileCompat>.findFileThatContainsUri(name: String): DocumentFileCompat? {
-    return this.firstOrNull() { file ->
-        file.uri.isNotEmpty() && file.uri.contains(
-            name
-        )
-    }
+    return this.firstOrNull() { file -> file.path.isNotEmpty() && file.path.contains(name) }
 }
 
 /**
@@ -52,12 +47,4 @@ fun Collection<DocumentFileCompat>.findFileThatContainsUri(name: String): Docume
  */
 internal fun String.toUri(): Uri {
     return Uri.parse(this)
-}
-
-
-/**
- * [String] to [File], nothing fancy here.
- */
-internal fun String.toFile(): File {
-    return File(this)
 }

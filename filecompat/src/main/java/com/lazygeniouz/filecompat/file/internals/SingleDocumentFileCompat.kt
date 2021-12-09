@@ -24,7 +24,7 @@ internal class SingleDocumentFileCompat(
         context: Context,
         fileCompat: DocumentFileCompat,
     ) : this(
-        context, fileCompat.uri, fileCompat.name,
+        context, fileCompat.path, fileCompat.name,
         fileCompat.length, fileCompat.lastModified,
         fileCompat.documentMimeType, fileCompat.documentFlags
     )
@@ -53,6 +53,15 @@ internal class SingleDocumentFileCompat(
      * @throws UnsupportedOperationException
      */
     override fun listFiles(): List<DocumentFileCompat> {
+        throw UnsupportedOperationException()
+    }
+
+    /**
+     * No [listFiles] so no iterating to search for something..
+     *
+     * @throws UnsupportedOperationException
+     */
+    override fun findFile(name: String): DocumentFileCompat? {
         throw UnsupportedOperationException()
     }
 }
