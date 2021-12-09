@@ -3,11 +3,11 @@ package com.lazygeniouz.filecompat.file
 import java.io.Serializable
 
 /**
- * This can be used as a [Serializable] object to pass around
+ * This can be used as a [Serializable] object to pass around the app
  * without creating your own Models as this only holds references to Primitive types.
  */
 class SerializedFile private constructor(
-    val uri: String, val name: String,
+    val uriPath: String, val name: String,
     val length: Long, val lastModified: Long,
     val mimeType: String, val flags: Int
 ) : Serializable {
@@ -27,7 +27,7 @@ class SerializedFile private constructor(
         internal fun from(file: DocumentFileCompat): SerializedFile {
             file.apply {
                 return SerializedFile(
-                    uri, name, length,
+                    path, name, length,
                     lastModified, documentMimeType, documentFlags
                 )
             }
