@@ -34,7 +34,7 @@ object Performance {
     }
 
     data class FileHolderPojo(
-        val documentUri: String,
+        val documentUri: Uri,
         val documentName: String = "",
         val documentSize: Int = 0,
         val lastModifiedTime: Long = -1L,

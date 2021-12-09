@@ -97,7 +97,7 @@ object DirectoryPerformance {
         DocumentFile.fromTreeUri(context, uri)?.listFiles()?.forEach { documentFile ->
             listOfUsableElements.add(
                 Performance.FileHolderPojo(
-                    documentFile.uri.toString(),
+                    documentFile.uri,
                     // Each of this will call ContentResolver
                     documentFile.name ?: "",
                     documentFile.length().toInt(),
