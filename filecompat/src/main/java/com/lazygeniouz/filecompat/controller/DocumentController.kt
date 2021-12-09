@@ -8,7 +8,6 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
 import android.provider.DocumentsContract.isDocumentUri
-import com.lazygeniouz.filecompat.extension.toUri
 import com.lazygeniouz.filecompat.file.DocumentFileCompat
 import com.lazygeniouz.filecompat.resolver.ResolverCompat
 
@@ -24,13 +23,11 @@ internal class DocumentController(
     private val fileCompat: DocumentFileCompat
 ) {
 
-    private val uri = fileCompat.uri.toUri()
-
     // DocumentsContract API level 24.
     private val flagVirtualDocument = 1 shl 9
 
     // File Handler to call delegate functions.
-    private val resolverCompat by lazy { ResolverCompat(context, uri) }
+    private val resolverCompat by lazy { ResolverCompat(context, fileCompat.uri) }
 
     /**
      * This will return a list of [DocumentFileCompat] with all the defined fields.
@@ -53,10 +50,9 @@ internal class DocumentController(
      *
      * Indicates that a document is virtual,
      * and doesn't have byte representation in the MIME type specified as COLUMN_MIME_TYPE.
-     *
      */
     internal fun isVirtual(): Boolean {
-        if (!isDocumentUri(context, uri)) return false
+        if (!isDocumentUri(context, fileCompat.uri)) return false
 
         return fileCompat.documentFlags and flagVirtualDocument != 0
     }
@@ -80,7 +76,7 @@ internal class DocumentController(
      */
     internal fun canRead(): Boolean {
         if (context.checkCallingOrSelfUriPermission(
-                uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                fileCompat.uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
             ) != PackageManager.PERMISSION_GRANTED
         ) return false
 
@@ -94,7 +90,7 @@ internal class DocumentController(
      */
     internal fun canWrite(): Boolean {
         if (context.checkCallingOrSelfUriPermission(
-                uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                fileCompat.uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             ) != PackageManager.PERMISSION_GRANTED
         ) return false
 

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.DocumentsContract.isDocumentUri
 import com.lazygeniouz.filecompat.controller.DocumentController
 import com.lazygeniouz.filecompat.extension.toSerializedList
+import com.lazygeniouz.filecompat.extension.toUri
 import com.lazygeniouz.filecompat.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.filecompat.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.filecompat.file.internals.TreeDocumentFileCompat
@@ -20,7 +21,7 @@ import java.io.File
  */
 abstract class DocumentFileCompat(
     internal val context: Context?,
-    val uri: String,
+    internal val path: String,
     val name: String = "",
     open val length: Long = 0,
     val lastModified: Long = -1L,
@@ -59,6 +60,20 @@ abstract class DocumentFileCompat(
      * only when the current document is a **Directory**, **null** otherwise
      */
     abstract fun listFiles(): List<DocumentFileCompat>
+
+    /**
+     * Find a File against the given name.
+     *
+     *
+     * Do not use this if you are going to call `listFiles()` again on the same
+     * DocumentFileCompat object because this method internally searches same list.
+     *
+     * Multiple calls to `listFiles()` can have a performance hit.
+     */
+    abstract fun findFile(name: String): DocumentFileCompat?
+
+    open val uri: Uri
+        get() = path.toUri()
 
     /**
      * Get the extension of the Document **File**.
@@ -142,7 +157,7 @@ abstract class DocumentFileCompat(
     companion object {
 
         /**
-         * Build an initial Document Tree with this helper.
+         * Build a Document Tree with this helper.
          *
          * @param context Required for queries to [ContentResolver]
          * @param uri uri which will be queried
@@ -154,7 +169,7 @@ abstract class DocumentFileCompat(
         }
 
         /**
-         * Build an initial Document File with this helper.
+         * Build a Document File with this helper.
          *
          * @param context Required for queries to [ContentResolver]
          * @param uri Uri which will be queried
@@ -169,7 +184,7 @@ abstract class DocumentFileCompat(
         /**
          * Build an initial File with this helper.
          *
-         * RawFileCompat serves as an alternative to the **RawDocumentFile**
+         * RawDocumentFileCompat serves as an alternative to the **RawDocumentFile**
          * which handles Documents using the native [File] api.
          */
         fun fromFile(file: File): DocumentFileCompat {
