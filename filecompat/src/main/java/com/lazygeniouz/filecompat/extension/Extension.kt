@@ -1,6 +1,5 @@
 package com.lazygeniouz.filecompat.extension
 
-import android.net.Uri
 import com.lazygeniouz.filecompat.file.DocumentFileCompat
 import com.lazygeniouz.filecompat.file.SerializedFile
 
@@ -40,11 +39,4 @@ fun Collection<DocumentFileCompat>.findFile(name: String): DocumentFileCompat? {
  */
 fun Collection<DocumentFileCompat>.findFileThatContainsUri(name: String): DocumentFileCompat? {
     return this.firstOrNull() { file -> file.path.isNotEmpty() && file.path.contains(name) }
-}
-
-/**
- * [String] to [Uri], nothing fancy here.
- */
-internal fun String.toUri(): Uri {
-    return Uri.parse(this)
 }

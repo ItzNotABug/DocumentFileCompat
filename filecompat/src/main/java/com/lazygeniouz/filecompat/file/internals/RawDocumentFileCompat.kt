@@ -13,14 +13,14 @@ import java.io.File
  * Other params same as [DocumentFileCompat] except there's no Context here.
  */
 internal class RawDocumentFileCompat constructor(
-    documentUri: String, documentName: String = "", documentSize: Long = 0,
+    filePath: String, documentName: String = "", documentSize: Long = 0,
     lastModifiedTime: Long = -1L, documentMimeType: String = "", documentFlags: Int = -1,
 ) : DocumentFileCompat(
-    null, documentUri, documentName, documentSize,
+    null, filePath, documentName, documentSize,
     lastModifiedTime, documentFlags, documentMimeType
 ) {
 
-    var file: File = File(documentUri)
+    var file: File = File(filePath)
 
     /**
      * Returns a [Uri] via [Uri.fromFile] but
@@ -42,7 +42,7 @@ internal class RawDocumentFileCompat constructor(
     /**
      * Delete the file & return the result.
      *
-     * Note it will delete the everything if this is a folder
+     * Note it will delete the everything **recursively** if this is a folder
      * because this uses Kotlin extension [File.deleteRecursively].
      */
     override fun delete(): Boolean {
@@ -102,7 +102,6 @@ internal class RawDocumentFileCompat constructor(
         return try {
             if (target.createNewFile()) fromFile(target)
             else null
-
         } catch (exception: Exception) {
             println("DocumentFileCompat: Exception while creating a document = ${exception.message}")
             null
@@ -117,7 +116,7 @@ internal class RawDocumentFileCompat constructor(
         else null
     }
 
-    // Performance of Files api is pretty great as compared to others.
+    // Performance of File api is pretty great as compared to others.
     override fun listFiles(): List<DocumentFileCompat> {
         val filesList = arrayListOf<DocumentFileCompat>()
         file.listFiles()?.onEach { child -> filesList.add(fromFile(child)) }

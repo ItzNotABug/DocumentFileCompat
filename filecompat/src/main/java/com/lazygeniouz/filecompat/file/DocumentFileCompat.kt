@@ -6,7 +6,6 @@ import android.net.Uri
 import android.provider.DocumentsContract.isDocumentUri
 import com.lazygeniouz.filecompat.controller.DocumentController
 import com.lazygeniouz.filecompat.extension.toSerializedList
-import com.lazygeniouz.filecompat.extension.toUri
 import com.lazygeniouz.filecompat.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.filecompat.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.filecompat.file.internals.TreeDocumentFileCompat
@@ -14,10 +13,10 @@ import com.lazygeniouz.filecompat.resolver.ResolverCompat
 import java.io.File
 
 /**
- * This cannot be used as a Serializable
- * because this class holds a reference to [Context].
+ * The base class that handles multiple URI cases like SingleDocumentUri,
+ * TreeDocumentUri & even File API support.
  *
- * Use [DocumentFileCompat.serialize] for a [Serializable] object.
+ * Use [DocumentFileCompat.serialize] to get a [Serializable] object.
  */
 abstract class DocumentFileCompat(
     internal val context: Context?,
@@ -73,12 +72,13 @@ abstract class DocumentFileCompat(
     abstract fun findFile(name: String): DocumentFileCompat?
 
     open val uri: Uri
-        get() = path.toUri()
+        get() = Uri.parse(path)
 
     /**
      * Get the extension of the Document **File**.
      */
     open val extension: String
+        // taken from Kotlin extension
         get() = name.substringAfterLast('.', "")
 
     /**
