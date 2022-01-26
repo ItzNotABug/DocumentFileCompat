@@ -9,6 +9,7 @@ import com.lazygeniouz.filecompat.file.DocumentFileCompat
 import java.io.File
 import java.util.*
 
+@Suppress("deprecation")
 object DirectoryPerformance {
 
     fun calculateDirectorySidePerformance(context: Context, uri: Uri): String {
