@@ -14,7 +14,7 @@ object DirectoryPerformance {
     fun calculateDirectorySidePerformance(context: Context, uri: Uri): String {
         var results = ""
         results += calculateNativeFilePerformance(uri) + "\n\n"
-        results += calculateRawFileCompatPerformance(uri) + "\n\n"
+        results += calculateRawFileCompatPerformance(context, uri) + "\n\n"
 
         results += "=".repeat(48).plus("\n\n")
         results += "Fetch Uri & build a custom model,\nFileCompat Vs. DocumentFile\n\n"
@@ -34,9 +34,11 @@ object DirectoryPerformance {
     // This test also requires the File Access Permission
     private fun calculateNativeFilePerformance(uri: Uri): String {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (Environment.isExternalStorageManager())
+            if (Environment.isExternalStorageManager()) {
                 runFilesPerformance(uri)
-            else "Android R+ requires All Files Access for this test to run."
+            } else {
+                "Android R+ requires All Files Access for this test to run."
+            }
         } else {
             runFilesPerformance(uri)
         }
@@ -44,13 +46,15 @@ object DirectoryPerformance {
 
     // This test also requires the File Access Permission.
     // Comes Second to the Native File API due to building internal objects.
-    private fun calculateRawFileCompatPerformance(uri: Uri): String {
+    private fun calculateRawFileCompatPerformance(context: Context, uri: Uri): String {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (Environment.isExternalStorageManager())
-                runFilesCompatPerformance(uri)
-            else "Android R+ requires All Files Access for this test to run."
+            if (Environment.isExternalStorageManager()) {
+                runFilesCompatPerformance(context, uri)
+            } else {
+                "Android R+ requires All Files Access for this test to run."
+            }
         } else {
-            runFilesCompatPerformance(uri)
+            runFilesCompatPerformance(context, uri)
         }
     }
 
@@ -69,13 +73,13 @@ object DirectoryPerformance {
         return (message)
     }
 
-    private fun runFilesCompatPerformance(uri: Uri): String {
+    private fun runFilesCompatPerformance(context: Context, uri: Uri): String {
         // If the paths file for tests, just hardcode with a fixed directory.
         val formattedPath = Performance.getUsablePath(uri)
         val file = File(Environment.getExternalStorageDirectory(), formattedPath)
 
         val startingTime = Date().time
-        val files = DocumentFileCompat.fromFile(file).listFiles()
+        val files = DocumentFileCompat.fromFile(context, file).listFiles()
 
         val endCount = Performance.getDifference(startingTime)
         val message = "Folder has ${files.size} items.\nRawFileCompat Performance = ${endCount}s"

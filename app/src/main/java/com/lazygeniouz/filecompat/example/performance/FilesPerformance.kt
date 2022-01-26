@@ -15,7 +15,7 @@ object FilesPerformance {
     fun calculateFileSidePerformance(context: Context, uri: Uri): String {
         var results = ""
         results += calculateFilePerformance(uri) + "\n\n\n"
-        results += calculateFileCompatPerformance(uri) + "\n\n\n"
+        results += calculateFileCompatPerformance(context, uri) + "\n\n\n"
         results += calculateDocumentFilePerformance(context, uri) + "\n"
         return results
     }
@@ -33,9 +33,9 @@ object FilesPerformance {
     }
 
     // FileCompat
-    private fun calculateFileCompatPerformance(uri: Uri): String {
+    private fun calculateFileCompatPerformance(context: Context, uri: Uri): String {
         val file = File(Environment.getExternalStorageDirectory(), Performance.getUsablePath(uri))
-        val fileCompat = DocumentFileCompat.fromFile(file)
+        val fileCompat = DocumentFileCompat.fromFile(context, file)
         val startingTime = Date().time
         var message = buildString(
             fileCompat.name,
