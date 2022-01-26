@@ -1,6 +1,7 @@
 package com.lazygeniouz.filecompat.file.internals
 
 import android.content.Context
+import android.net.Uri
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
 import com.lazygeniouz.filecompat.extension.findFile
 import com.lazygeniouz.filecompat.file.DocumentFileCompat
@@ -72,5 +73,19 @@ internal class TreeDocumentFileCompat constructor(
      */
     override fun findFile(name: String): DocumentFileCompat? {
         return listFiles().findFile(name)
+    }
+
+    /**
+     * Copy would work only if the underlying Uri is a SingleDocumentFile or a File.
+     */
+    override fun copyTo(destination: Uri) {
+        throw UnsupportedOperationException("Cannot open a stream on a tree")
+    }
+
+    /**
+     * Copy would work only if the underlying Uri is a SingleDocumentFile or a File.
+     */
+    override fun copyFrom(source: Uri) {
+        throw UnsupportedOperationException("Cannot open a stream on a tree")
     }
 }

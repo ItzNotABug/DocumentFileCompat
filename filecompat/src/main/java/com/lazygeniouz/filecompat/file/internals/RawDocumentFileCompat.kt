@@ -1,5 +1,6 @@
 package com.lazygeniouz.filecompat.file.internals
 
+import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import com.lazygeniouz.filecompat.extension.findFile
@@ -12,15 +13,11 @@ import java.io.File
  *
  * Other params same as [DocumentFileCompat] except there's no Context here.
  */
-internal class RawDocumentFileCompat constructor(
-    filePath: String, documentName: String = "", documentSize: Long = 0,
-    lastModifiedTime: Long = -1L, documentMimeType: String = "", documentFlags: Int = -1,
-) : DocumentFileCompat(
-    null, filePath, documentName, documentSize,
-    lastModifiedTime, documentFlags, documentMimeType
-) {
-
-    var file: File = File(filePath)
+internal class RawDocumentFileCompat constructor(context: Context, var file: File) :
+    DocumentFileCompat(
+        context, file.absolutePath, file.name, file.length(),
+        file.lastModified(), -1, getMimeType(file)
+    ) {
 
     /**
      * Returns a [Uri] via [Uri.fromFile] but
@@ -100,7 +97,7 @@ internal class RawDocumentFileCompat constructor(
 
         val target = File(file, displayName)
         return try {
-            if (target.createNewFile()) fromFile(target)
+            if (target.createNewFile()) fromFile(context!!, target)
             else null
         } catch (exception: Exception) {
             println("DocumentFileCompat: Exception while creating a document = ${exception.message}")
@@ -112,20 +109,32 @@ internal class RawDocumentFileCompat constructor(
     // can be null if there was an Exception.
     override fun createDirectory(name: String): DocumentFileCompat? {
         val target = File(file, name)
-        return if (target.isDirectory || target.mkdir()) fromFile(target)
+        return if (target.isDirectory || target.mkdir()) fromFile(context!!, target)
         else null
     }
 
     // Performance of File api is pretty great as compared to others.
     override fun listFiles(): List<DocumentFileCompat> {
         val filesList = arrayListOf<DocumentFileCompat>()
-        file.listFiles()?.onEach { child -> filesList.add(fromFile(child)) }
+        file.listFiles()?.onEach { child -> filesList.add(fromFile(context!!, child)) }
         return filesList
     }
 
     // Return a file if exists, else **null**
     override fun findFile(name: String): DocumentFileCompat? {
         return listFiles().findFile(name)
+    }
+
+    // Copies current file to the destination uri.
+    override fun copyTo(destination: Uri) {
+        val outPutStream = context!!.contentResolver.openOutputStream(destination)!!
+        file.inputStream().use { inputStream -> inputStream.copyTo(outPutStream) }
+    }
+
+    // Copies current source file at this uri's location.
+    override fun copyFrom(source: Uri) {
+        val inputStream = context!!.contentResolver.openInputStream(source)!!
+        inputStream.use { stream -> stream.copyTo(file.outputStream()) }
     }
 
     internal companion object {

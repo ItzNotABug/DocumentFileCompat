@@ -1,6 +1,7 @@
 package com.lazygeniouz.filecompat.file.internals
 
 import android.content.Context
+import android.net.Uri
 import com.lazygeniouz.filecompat.file.DocumentFileCompat
 
 /**
@@ -63,5 +64,19 @@ internal class SingleDocumentFileCompat(
      */
     override fun findFile(name: String): DocumentFileCompat? {
         throw UnsupportedOperationException()
+    }
+
+    // Copies current file to the destination uri.
+    override fun copyTo(destination: Uri) {
+        val inputStream = context!!.contentResolver.openInputStream(uri)!!
+        val outputStream = context.contentResolver.openOutputStream(destination)!!
+        inputStream.use { stream -> stream.copyTo(outputStream) }
+    }
+
+    // Copies current source uri at this uri's location.
+    override fun copyFrom(source: Uri) {
+        val inputStream = context!!.contentResolver.openInputStream(source)!!
+        val outputStream = context.contentResolver.openOutputStream(uri)!!
+        inputStream.use { stream -> stream.copyTo(outputStream) }
     }
 }

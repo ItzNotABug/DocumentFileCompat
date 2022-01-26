@@ -71,6 +71,16 @@ abstract class DocumentFileCompat(
      */
     abstract fun findFile(name: String): DocumentFileCompat?
 
+    /**
+     * Copy a document to a given Uri.
+     */
+    abstract fun copyTo(destination: Uri)
+
+    /**
+     * Copy a document to this Uri from source.
+     */
+    abstract fun copyFrom(source: Uri)
+
     open val uri: Uri
         get() = Uri.parse(path)
 
@@ -175,8 +185,7 @@ abstract class DocumentFileCompat(
          * @param uri Uri which will be queried
          */
         fun fromSingleUri(context: Context, uri: Uri): DocumentFileCompat? {
-            val fileCompat = ResolverCompat(context, uri)
-                .getInitialFileCompat(false)
+            val fileCompat = ResolverCompat(context, uri).getInitialFileCompat(false)
             return if (fileCompat != null) SingleDocumentFileCompat(context, fileCompat)
             else null
         }
@@ -187,11 +196,8 @@ abstract class DocumentFileCompat(
          * RawDocumentFileCompat serves as an alternative to the **RawDocumentFile**
          * which handles Documents using the native [File] api.
          */
-        fun fromFile(file: File): DocumentFileCompat {
-            return RawDocumentFileCompat(
-                file.absolutePath, file.name, file.length(),
-                file.lastModified(), RawDocumentFileCompat.getMimeType(file)
-            )
+        fun fromFile(context: Context, file: File): DocumentFileCompat {
+            return RawDocumentFileCompat(context, file)
         }
 
         /**
