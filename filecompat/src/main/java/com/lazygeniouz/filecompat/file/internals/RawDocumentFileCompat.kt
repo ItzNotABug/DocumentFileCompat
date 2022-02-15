@@ -10,8 +10,6 @@ import java.io.File
 /**
  * RawDocumentFileCompat serves as an alternative to the **RawDocumentFile**
  * which handles Documents using the native [File] api.
- *
- * Other params same as [DocumentFileCompat] except there's no Context here.
  */
 internal class RawDocumentFileCompat constructor(context: Context, var file: File) :
     DocumentFileCompat(
@@ -97,7 +95,7 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
 
         val target = File(file, displayName)
         return try {
-            if (target.createNewFile()) fromFile(context!!, target)
+            if (target.createNewFile()) fromFile(context, target)
             else null
         } catch (exception: Exception) {
             println("DocumentFileCompat: Exception while creating a document = ${exception.message}")
@@ -109,14 +107,14 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
     // can be null if there was an Exception.
     override fun createDirectory(name: String): DocumentFileCompat? {
         val target = File(file, name)
-        return if (target.isDirectory || target.mkdir()) fromFile(context!!, target)
+        return if (target.isDirectory || target.mkdir()) fromFile(context, target)
         else null
     }
 
     // Performance of File api is pretty great as compared to others.
     override fun listFiles(): List<DocumentFileCompat> {
         val filesList = arrayListOf<DocumentFileCompat>()
-        file.listFiles()?.onEach { child -> filesList.add(fromFile(context!!, child)) }
+        file.listFiles()?.onEach { child -> filesList.add(fromFile(context, child)) }
         return filesList
     }
 
@@ -127,13 +125,13 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
 
     // Copies current file to the destination uri.
     override fun copyTo(destination: Uri) {
-        val outPutStream = context!!.contentResolver.openOutputStream(destination)!!
+        val outPutStream = context.contentResolver.openOutputStream(destination)!!
         file.inputStream().use { inputStream -> inputStream.copyTo(outPutStream) }
     }
 
     // Copies current source file at this uri's location.
     override fun copyFrom(source: Uri) {
-        val inputStream = context!!.contentResolver.openInputStream(source)!!
+        val inputStream = context.contentResolver.openInputStream(source)!!
         inputStream.use { stream -> stream.copyTo(file.outputStream()) }
     }
 

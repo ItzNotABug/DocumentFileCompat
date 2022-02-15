@@ -18,8 +18,8 @@ import java.io.File
  *
  * Use [DocumentFileCompat.serialize] to get a [Serializable] object.
  */
-abstract class DocumentFileCompat(
-    internal val context: Context?,
+abstract class DocumentFileCompat constructor(
+    internal val context: Context,
     internal val path: String,
     val name: String = "",
     open val length: Long = 0,
@@ -33,7 +33,7 @@ abstract class DocumentFileCompat(
      * by the [DocumentController] which is initialized **lazily** & would
      * never be initialized in the [RawDocumentFileCompat] as it uses the [File] api completely.
      */
-    internal val fileController by lazy { DocumentController(context!!, this) }
+    internal val fileController by lazy { DocumentController(context, this) }
 
     /**
      * Create a document file.

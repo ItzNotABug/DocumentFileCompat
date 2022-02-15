@@ -68,14 +68,14 @@ internal class SingleDocumentFileCompat(
 
     // Copies current file to the destination uri.
     override fun copyTo(destination: Uri) {
-        val inputStream = context!!.contentResolver.openInputStream(uri)!!
+        val inputStream = context.contentResolver.openInputStream(uri)!!
         val outputStream = context.contentResolver.openOutputStream(destination)!!
         inputStream.use { stream -> stream.copyTo(outputStream) }
     }
 
     // Copies current source uri at this uri's location.
     override fun copyFrom(source: Uri) {
-        val inputStream = context!!.contentResolver.openInputStream(source)!!
+        val inputStream = context.contentResolver.openInputStream(source)!!
         val outputStream = context.contentResolver.openOutputStream(uri)!!
         inputStream.use { stream -> stream.copyTo(outputStream) }
     }
