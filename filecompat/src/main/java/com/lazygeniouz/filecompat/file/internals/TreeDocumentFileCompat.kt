@@ -46,7 +46,7 @@ internal class TreeDocumentFileCompat constructor(
      */
     override fun createFile(mimeType: String, name: String): DocumentFileCompat? {
         val treeFileUri = fileController.createFile(mimeType, name)
-        return treeFileUri?.let { fromTreeUri(context!!, treeFileUri) }
+        return treeFileUri?.let { fromTreeUri(context, treeFileUri) }
     }
 
     /**
@@ -58,7 +58,7 @@ internal class TreeDocumentFileCompat constructor(
      */
     override fun createDirectory(name: String): DocumentFileCompat? {
         val treeFileUri = fileController.createFile(MIME_TYPE_DIR, name)
-        return treeFileUri?.let { fromTreeUri(context!!, treeFileUri) }
+        return treeFileUri?.let { fromTreeUri(context, treeFileUri) }
     }
 
     /**
