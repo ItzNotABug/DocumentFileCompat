@@ -92,10 +92,9 @@ internal class ResolverCompat(
     // Build relevant Tree Uri.
     private fun getTreeUri(uri: Uri): Uri {
         val isDocument = isDocumentUri(context, uri)
-        return buildDocumentUriUsingTree(
-            uri, if (isDocument) getDocumentId(uri)
-            else getTreeDocumentId(uri)
-        )
+        val correctUri = if (isDocument) getDocumentId(uri)
+        else getTreeDocumentId(uri)
+        return buildDocumentUriUsingTree(uri, correctUri)
     }
 
     // Returns True if the Uri is a Tree Uri, false otherwise.
@@ -137,10 +136,7 @@ internal class ResolverCompat(
 
     // Get a Cursor to query the given Uri against provided projection
     private fun getCursor(uri: Uri, projection: Array<String>): Cursor? {
-        return contentResolver.query(
-            uri, projection,
-            null, null, null
-        )
+        return contentResolver.query(uri, projection, null, null, null)
     }
 
     /**
@@ -150,7 +146,10 @@ internal class ResolverCompat(
      */
     private fun runInitialQuery(isTree: Boolean): DocumentFileCompat? {
         val uriToUse = if (!isTree) uri
-        else buildDocumentUriUsingTree(getTreeUri(uri), getDocumentId(getTreeUri(uri)))
+        else {
+            val treeUri = getTreeUri(uri)
+            buildDocumentUriUsingTree(treeUri, getDocumentId(treeUri))
+        }
 
         var singleDocument: DocumentFileCompat? = null
 
