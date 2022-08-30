@@ -115,7 +115,7 @@ internal class DocumentController(
      * @param mimeType Type of the file, e.g: text/plain.
      * @param name The name of the file.
      *
-     * @return A FileCompat object if file was created successfully, **null** otherwise.
+     * @return A Uri if file was created successfully, **null** otherwise.
      */
     internal fun createFile(mimeType: String, name: String): Uri? {
         return resolverCompat.createFile(mimeType, name)

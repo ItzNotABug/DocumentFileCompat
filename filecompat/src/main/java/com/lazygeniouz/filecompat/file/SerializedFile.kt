@@ -19,13 +19,14 @@ class SerializedFile private constructor(
 
         /**
          * Copy fields from a [DocumentFileCompat] object.
-         * This is sort of a **Read Only** object.
+         *
+         * This is a **Read Only** object.
          *
          * @param file [DocumentFileCompat] object for copying primitive data types.
          * @return A Serializable object.
          */
         internal fun from(file: DocumentFileCompat): SerializedFile {
-            file.apply {
+            with(file) {
                 return SerializedFile(
                     path, name, length,
                     lastModified, documentMimeType, documentFlags
