@@ -12,10 +12,7 @@ import java.io.File
  * which handles Documents using the native [File] api.
  */
 internal class RawDocumentFileCompat constructor(context: Context, var file: File) :
-    DocumentFileCompat(
-        context, file.absolutePath, file.name, file.length(),
-        file.lastModified(), -1, getMimeType(file)
-    ) {
+    DocumentFileCompat(context, file) {
 
     /**
      * Returns a [Uri] via [Uri.fromFile] but
@@ -123,13 +120,13 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
         return listFiles().findFile(name)
     }
 
-    // Copies current file to the destination uri.
+    // Copies current file to the provided destination uri.
     override fun copyTo(destination: Uri) {
         val outPutStream = context.contentResolver.openOutputStream(destination)!!
         file.inputStream().use { inputStream -> inputStream.copyTo(outPutStream) }
     }
 
-    // Copies current source file at this uri's location.
+    // Copies current source file at current uri's location.
     override fun copyFrom(source: Uri) {
         val inputStream = context.contentResolver.openInputStream(source)!!
         inputStream.use { stream -> stream.copyTo(file.outputStream()) }
@@ -139,10 +136,8 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
         internal fun getMimeType(file: File): String {
             if (file.isDirectory) return ""
 
-            val mimeType = MimeTypeMap
-                .getSingleton()
-                .getMimeTypeFromExtension(file.extension)
-
+            val mimeTypeMap = MimeTypeMap.getSingleton()
+            val mimeType = mimeTypeMap.getMimeTypeFromExtension(file.extension)
             if (mimeType != null) return mimeType
 
             return "application/octet-stream"

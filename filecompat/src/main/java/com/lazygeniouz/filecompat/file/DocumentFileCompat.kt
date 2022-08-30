@@ -28,6 +28,12 @@ abstract class DocumentFileCompat constructor(
     internal val documentMimeType: String = ""
 ) {
 
+    // Secondary constructor for java.io.File type
+    constructor(context: Context, file: File) : this(
+        context, file.absolutePath, file.name, file.length(),
+        file.lastModified(), -1, RawDocumentFileCompat.getMimeType(file)
+    )
+
     /**
      * Context is asserted as **NonNull** here because it is only required
      * by the [DocumentController] which is initialized **lazily** & would
