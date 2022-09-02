@@ -1,8 +1,8 @@
-package com.lazygeniouz.filecompat.file.internals
+package com.lazygeniouz.dfc.file.internals
 
 import android.content.Context
 import android.net.Uri
-import com.lazygeniouz.filecompat.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.DocumentFileCompat
 
 /**
  * SingleFileCompat serves as an alternative to the **SingleDocumentFile**

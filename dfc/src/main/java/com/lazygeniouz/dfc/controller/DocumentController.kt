@@ -1,4 +1,4 @@
-package com.lazygeniouz.filecompat.controller
+package com.lazygeniouz.dfc.controller
 
 import android.content.ContentResolver
 import android.content.Context
@@ -8,8 +8,8 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
 import android.provider.DocumentsContract.isDocumentUri
-import com.lazygeniouz.filecompat.file.DocumentFileCompat
-import com.lazygeniouz.filecompat.resolver.ResolverCompat
+import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.resolver.ResolverCompat
 
 
 /**

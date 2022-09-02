@@ -1,7 +1,7 @@
-package com.lazygeniouz.filecompat.extension
+package com.lazygeniouz.dfc.extension
 
-import com.lazygeniouz.filecompat.file.DocumentFileCompat
-import com.lazygeniouz.filecompat.file.SerializedFile
+import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.SerializedFile
 
 /**
  * If you need a [Serializable] list, this extension should be used.

@@ -1,4 +1,4 @@
-package com.lazygeniouz.filecompat.file
+package com.lazygeniouz.dfc.file
 
 import java.io.Serializable
 

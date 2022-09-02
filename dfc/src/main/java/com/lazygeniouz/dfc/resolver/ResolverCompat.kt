@@ -1,4 +1,4 @@
-package com.lazygeniouz.filecompat.resolver
+package com.lazygeniouz.dfc.resolver
 
 import android.content.ContentResolver
 import android.content.Context
@@ -6,9 +6,9 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract.*
 import android.provider.DocumentsContract.Document.*
-import com.lazygeniouz.filecompat.file.DocumentFileCompat
-import com.lazygeniouz.filecompat.file.internals.SingleDocumentFileCompat
-import com.lazygeniouz.filecompat.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
+import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 
 /**
  * This class calls relevant queries on the [ContentResolver]

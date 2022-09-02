@@ -1,15 +1,15 @@
-package com.lazygeniouz.filecompat.file
+package com.lazygeniouz.dfc.file
 
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract.isDocumentUri
-import com.lazygeniouz.filecompat.controller.DocumentController
-import com.lazygeniouz.filecompat.extension.toSerializedList
-import com.lazygeniouz.filecompat.file.internals.RawDocumentFileCompat
-import com.lazygeniouz.filecompat.file.internals.SingleDocumentFileCompat
-import com.lazygeniouz.filecompat.file.internals.TreeDocumentFileCompat
-import com.lazygeniouz.filecompat.resolver.ResolverCompat
+import com.lazygeniouz.dfc.controller.DocumentController
+import com.lazygeniouz.dfc.extension.toSerializedList
+import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
+import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
+import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.resolver.ResolverCompat
 import java.io.File
 
 /**

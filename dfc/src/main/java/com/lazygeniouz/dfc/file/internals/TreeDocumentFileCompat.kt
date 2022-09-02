@@ -1,10 +1,10 @@
-package com.lazygeniouz.filecompat.file.internals
+package com.lazygeniouz.dfc.file.internals
 
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
-import com.lazygeniouz.filecompat.extension.findFile
-import com.lazygeniouz.filecompat.file.DocumentFileCompat
+import com.lazygeniouz.dfc.extension.findFile
+import com.lazygeniouz.dfc.file.DocumentFileCompat
 
 /**
  * TreeFileCompat serves as an alternative to the **TreeDocumentFile**
