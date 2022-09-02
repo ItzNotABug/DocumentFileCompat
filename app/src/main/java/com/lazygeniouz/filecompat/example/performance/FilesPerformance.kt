@@ -5,7 +5,7 @@ import android.net.Uri
 import android.os.Environment
 import androidx.documentfile.provider.DocumentFile
 import com.lazygeniouz.filecompat.example.performance.Performance.getSizeInMb
-import com.lazygeniouz.filecompat.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.DocumentFileCompat
 import java.io.File
 import java.util.*
 
@@ -57,8 +57,7 @@ object FilesPerformance {
         var message = buildString(
             documentFile?.name!!,
             documentFile.name!!.substringAfterLast("."),
-            documentFile.lastModified(),
-            documentFile.length()
+            documentFile.lastModified(), documentFile.length()
         )
         val endCount = Performance.getDifference(startingTime, 1000.0000)
 

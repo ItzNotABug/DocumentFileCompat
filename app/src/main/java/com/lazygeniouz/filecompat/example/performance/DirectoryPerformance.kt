@@ -5,7 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import androidx.documentfile.provider.DocumentFile
-import com.lazygeniouz.filecompat.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.DocumentFileCompat
 import java.io.File
 import java.util.*
 
