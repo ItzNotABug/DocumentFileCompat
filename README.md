@@ -39,7 +39,7 @@ This is now a completely usable alternative to `DocumentFile`.
 
 ```gradle
 dependencies {
-    implementation "com.lazygeniouz:documentfile_compat:$latest_version"
+    implementation "com.lazygeniouz:dfc:$latest_version"
 }
 ```
 
@@ -48,7 +48,7 @@ dependencies {
 ```maven
 <dependency>
   <groupId>com.lazygeniouz</groupId>
-  <artifactId>documentfile_compat</artifactId>
+  <artifactId>dfc</artifactId>
   <version>$latest_version</version>
   <type>aar</type>
 </dependency>
