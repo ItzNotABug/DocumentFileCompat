@@ -45,7 +45,7 @@ dependencies {
 
 #### Maven
 
-```maven
+```xml
 <dependency>
   <groupId>com.lazygeniouz</groupId>
   <artifactId>dfc</artifactId>
