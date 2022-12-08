@@ -5,6 +5,7 @@ plugins {
 
 android {
     compileSdk 33
+    namespace 'com.lazygeniouz.filecompat.example'
 
     defaultConfig {
         applicationId "com.lazygeniouz.filecompat.example"
@@ -36,7 +37,8 @@ android {
 
 dependencies {
     implementation project(':dfc')
-    implementation 'androidx.appcompat:appcompat:1.5.0'
-    implementation 'androidx.activity:activity-ktx:1.5.1'
-    implementation 'com.google.android.material:material:1.6.1'
+
+    implementation 'androidx.appcompat:appcompat:1.5.1'
+    implementation 'androidx.activity:activity-ktx:1.6.1'
+    implementation 'com.google.android.material:material:1.7.0'
 }

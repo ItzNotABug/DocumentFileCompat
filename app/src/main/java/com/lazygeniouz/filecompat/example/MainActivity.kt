@@ -75,7 +75,6 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
             }
         }
 
-    @Suppress("unchecked_cast")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -102,7 +101,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
         }
     }
 
-    override fun onBackPressed() {
-        finishAffinity()
-    }
+    @Suppress("override_deprecation")
+    // this is just a sample app, ignore this.
+    override fun onBackPressed() = finishAffinity()
 }

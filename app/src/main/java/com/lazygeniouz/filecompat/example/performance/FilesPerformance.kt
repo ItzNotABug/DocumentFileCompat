@@ -4,9 +4,11 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import androidx.documentfile.provider.DocumentFile
-import com.lazygeniouz.filecompat.example.performance.Performance.getSizeInMb
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.filecompat.example.performance.Performance.getSizeInMb
+import com.lazygeniouz.filecompat.example.performance.Performance.measureTimeSeconds
 import java.io.File
+import java.text.SimpleDateFormat
 import java.util.*
 
 @Suppress("deprecation")
@@ -22,56 +24,60 @@ object FilesPerformance {
 
     // Native File
     private fun calculateFilePerformance(uri: Uri): String {
-        val file = File(Environment.getExternalStorageDirectory(), Performance.getUsablePath(uri))
-        val startingTime = Date().time
-
-        var message = buildString(file.name, file.extension, file.lastModified(), file.length())
-        val endCount = Performance.getDifference(startingTime, 1000.0000)
-
-        message = "$message\nNative File Performance = ${endCount}s"
-        return (message)
+        var message = ""
+        measureTimeSeconds {
+            val usableUri = Performance.getUsablePath(uri)
+            val file = File(Environment.getExternalStorageDirectory(), usableUri)
+            message = buildString(file.name, file.extension, file.lastModified(), file.length())
+        }.also { time ->
+            message = "$message\nNative File Performance = ${time}s"
+            return (message)
+        }
     }
 
     // FileCompat
     private fun calculateFileCompatPerformance(context: Context, uri: Uri): String {
-        val file = File(Environment.getExternalStorageDirectory(), Performance.getUsablePath(uri))
-        val fileCompat = DocumentFileCompat.fromFile(context, file)
-        val startingTime = Date().time
-        var message = buildString(
-            fileCompat.name,
-            fileCompat.extension,
-            fileCompat.lastModified,
-            fileCompat.length
-        )
-        val endCount = Performance.getDifference(startingTime, 1000.0000)
-
-        message = "$message\nFileCompat Performance = ${endCount}s"
-        return (message)
+        var message = ""
+        measureTimeSeconds {
+            val usableUri = Performance.getUsablePath(uri)
+            val file = File(Environment.getExternalStorageDirectory(), usableUri)
+            val fileCompat = DocumentFileCompat.fromFile(context, file)
+            message = buildString(
+                fileCompat.name,
+                fileCompat.extension,
+                fileCompat.lastModified,
+                fileCompat.length)
+        }.also { time ->
+            message = "$message\nDFC Performance = ${time}s"
+            return (message)
+        }
     }
 
     // DocumentFile
     private fun calculateDocumentFilePerformance(context: Context, uri: Uri): String {
-        val documentFile = DocumentFile.fromSingleUri(context, uri)
-        val startingTime = Date().time
-
-        var message = buildString(
-            documentFile?.name!!,
-            documentFile.name!!.substringAfterLast("."),
-            documentFile.lastModified(), documentFile.length()
-        )
-        val endCount = Performance.getDifference(startingTime, 1000.0000)
-
-        message = "$message\nDocumentFile File Performance = ${endCount}s"
-        return (message)
+        var message = ""
+        measureTimeSeconds {
+            val documentFile = DocumentFile.fromSingleUri(context, uri)
+            message = buildString(documentFile?.name!!,
+                documentFile.name!!.substringAfterLast("."),
+                documentFile.lastModified(),
+                documentFile.length())
+        }.also { time ->
+            message = "$message\nDocumentFile Performance = ${time}s"
+            return (message)
+        }
     }
 
     private fun buildString(
         name: String, extension: String,
-        lastModified: Long, fileSize: Long
+        lastModified: Long, fileSize: Long,
     ): String {
-        return "File Name: ${name}," +
-                "\nFile Extension: ${extension}," +
-                "\nFile Size: ${getSizeInMb(fileSize)}," +
-                "\nFile last modified: ${Date(lastModified)}"
+        return "Name: ${name}," +
+                "\nSize: ${getSizeInMb(fileSize)}, " +
+                "Extension: ${extension}, " +
+                "\nLast modified: ${
+                    SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
+                        .format(Date(lastModified))
+                }"
     }
 }

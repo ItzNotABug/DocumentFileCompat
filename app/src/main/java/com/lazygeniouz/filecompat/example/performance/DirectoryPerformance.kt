@@ -6,10 +6,9 @@ import android.os.Build
 import android.os.Environment
 import androidx.documentfile.provider.DocumentFile
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.filecompat.example.performance.Performance.measureTimeSeconds
 import java.io.File
-import java.util.*
 
-@Suppress("deprecation")
 object DirectoryPerformance {
 
     fun calculateDirectorySidePerformance(context: Context, uri: Uri): String {
@@ -18,13 +17,12 @@ object DirectoryPerformance {
         results += calculateRawFileCompatPerformance(context, uri) + "\n\n"
 
         results += "=".repeat(48).plus("\n\n")
-        results += "Fetch Uri & build a custom model,\nFileCompat Vs. DocumentFile\n\n"
-        results += calculateFileCompatPerformance(context, uri) + "\n"
+        results += calculateDocumentFileCompatPerformance(context, uri) + "\n"
         results += calculateDocumentFilePerformance(context, uri) + "\n\n"
 
         results += "=".repeat(48).plus("\n\n")
-        results += "Fetching only Uris will always be faster (after File)" +
-                "\nBut try fetching the Documents' Names.\n\n"
+        results += "Fetching only Uris will always be faster (after File)" + "\nBut try fetching the Documents' Names.\n\n"
+        results += calculateDocumentFileCompatPerformanceWithName(context, uri) + "\n"
         results += calculateDocumentFilePerformanceOnlyUri(context, uri) + "\n"
         results += calculateDocumentFilePerformanceWithName(context, uri)
         return results
@@ -60,77 +58,84 @@ object DirectoryPerformance {
     }
 
     private fun runFilesPerformance(uri: Uri): String {
-        // If the paths file for tests, just hardcode with a fixed directory.
-        val formattedPath = Performance.getUsablePath(uri)
-
-        val startingTime = Date().time
-        val files = File(
-            Environment.getExternalStorageDirectory(),
-            formattedPath
-        ).listFiles()
-
-        val endCount = Performance.getDifference(startingTime)
-        val message = "Folder has ${files?.size} items.\nNative File Performance = ${endCount}s"
-        return (message)
+        var size: Int = -1
+        measureTimeSeconds {
+            // If the paths file for tests, just hardcode with a fixed directory.
+            val formattedPath = Performance.getUsablePath(uri)
+            val files = File(Environment.getExternalStorageDirectory(), formattedPath).listFiles()
+            size = files?.size ?: -1
+        }.also { time ->
+            val message = "Folder has $size items.\nNative File Performance = ${time}s"
+            return (message)
+        }
     }
 
     private fun runFilesCompatPerformance(context: Context, uri: Uri): String {
-        // If the paths file for tests, just hardcode with a fixed directory.
-        val formattedPath = Performance.getUsablePath(uri)
-        val file = File(Environment.getExternalStorageDirectory(), formattedPath)
-
-        val startingTime = Date().time
-        val files = DocumentFileCompat.fromFile(context, file).listFiles()
-
-        val endCount = Performance.getDifference(startingTime)
-        val message = "Folder has ${files.size} items.\nRawFileCompat Performance = ${endCount}s"
-        return (message)
+        var size: Int = -1
+        measureTimeSeconds {
+            // If the paths file for tests, just hardcode with a fixed directory.
+            val formattedPath = Performance.getUsablePath(uri)
+            val file = File(Environment.getExternalStorageDirectory(), formattedPath)
+            val files = DocumentFileCompat.fromFile(context, file).listFiles()
+            size = files.size
+        }.also { time ->
+            val message = "Folder has $size items.\nRawFileCompat Performance = ${time}s"
+            return (message)
+        }
     }
 
-    private fun calculateFileCompatPerformance(context: Context, uri: Uri): String {
-        val startingTime = Date().time
-        DocumentFileCompat.fromTreeUri(context, uri)?.listFiles()
-
-        // This files have following data for easy accessibility
-        // Uri, Name, Last Modified time
-        return ("FileCompat Performance = ${Performance.getDifference(startingTime)}s")
+    private fun calculateDocumentFileCompatPerformance(context: Context, uri: Uri): String {
+        measureTimeSeconds {
+            val documentFile = DocumentFileCompat.fromTreeUri(context, uri)
+            documentFile?.listFiles()
+        }.also { time ->
+            // This files have Uri, Name, Last Modified time for easy accessibility
+            return ("DFC Performance = ${time}s")
+        }
     }
 
     private fun calculateDocumentFilePerformance(context: Context, uri: Uri): String {
-        val startingTime = Date().time
-        val listOfUsableElements = arrayListOf<Performance.FileHolderPojo>()
-        DocumentFile.fromTreeUri(context, uri)?.listFiles()?.forEach { documentFile ->
-            listOfUsableElements.add(
-                Performance.FileHolderPojo(
+        measureTimeSeconds {
+            val listOfUsableElements = arrayListOf<Performance.FileHolderPojo>()
+            DocumentFile.fromTreeUri(context, uri)?.listFiles()?.forEach { documentFile ->
+                listOfUsableElements.add(Performance.FileHolderPojo(
                     documentFile.uri,
                     // Each of this will call ContentResolver
-                    documentFile.name ?: "",
+                    documentFile.name.orEmpty(),
                     documentFile.length().toInt(),
                     documentFile.lastModified(),
-                    documentFile.type ?: "",
-                )
-            )
-        }
-
-        return ("DocumentFile Performance = ${Performance.getDifference(startingTime)}s")
+                    documentFile.type.orEmpty(),
+                ))
+            }
+        }.also { time -> return ("DocumentFile Performance = ${time}s") }
     }
 
     private fun calculateDocumentFilePerformanceOnlyUri(context: Context, uri: Uri): String {
-        val startingTime = Date().time
-        DocumentFile.fromTreeUri(context, uri)?.listFiles()
-
-        // This files have only a Uri, so this operation would be faster
-        return ("DocumentFile Performance (Uri Only) = ${Performance.getDifference(startingTime)}s")
+        measureTimeSeconds {
+            DocumentFile.fromTreeUri(context, uri)?.listFiles()
+        }.also { time ->
+            // These files only have a Uri, so this operation is kinda faster
+            return ("DocumentFile Performance (Uri Only) = ${time}s")
+        }
     }
 
     private fun calculateDocumentFilePerformanceWithName(context: Context, uri: Uri): String {
-        val startingTime = Date().time
-        val listOfUsableElements = arrayListOf<String>()
-        DocumentFile.fromTreeUri(context, uri)?.listFiles()?.forEach { documentFile ->
-            listOfUsableElements.add(documentFile.name ?: "")
-        }
-
-        return ("DocumentFile Performance (With Names) = ${Performance.getDifference(startingTime)}s")
+        measureTimeSeconds {
+            val listOfUsableElements = arrayListOf<String>()
+            DocumentFile.fromTreeUri(context, uri)?.listFiles()?.forEach { documentFile ->
+                listOfUsableElements.add(documentFile.name.orEmpty())
+            }
+        }.also { time -> return ("DocumentFile Performance (With Names) = ${time}s") }
     }
 
+    private fun calculateDocumentFileCompatPerformanceWithName(context: Context, uri: Uri): String {
+        measureTimeSeconds {
+            val listOfUsableElements = arrayListOf<String>()
+            DocumentFileCompat.fromTreeUri(context, uri)?.listFiles()?.forEach { documentFile ->
+                listOfUsableElements.add(documentFile.name)
+            }
+        }.also { time ->
+            return ("DFC Performance (With Names) = ${time}s")
+        }
+    }
 }
