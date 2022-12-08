@@ -1,6 +1,7 @@
 package com.lazygeniouz.dfc.file.internals
 
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 
@@ -9,7 +10,7 @@ import com.lazygeniouz.dfc.file.DocumentFileCompat
  * which handles Documents having **NO** Tree structure, i.e. Just Files.
  *
  *
- * @param context Context required by the FileCompat internally.
+ * @param context Context required by the DocumentFileCompat internally.
  *
  * Other params same as [DocumentFileCompat].
  */
@@ -20,15 +21,6 @@ internal class SingleDocumentFileCompat(
     context, documentUri, documentName, documentSize,
     lastModifiedTime, documentFlags, documentMimeType
 ) {
-
-    internal constructor(
-        context: Context,
-        fileCompat: DocumentFileCompat,
-    ) : this(
-        context, fileCompat.path, fileCompat.name,
-        fileCompat.length, fileCompat.lastModified,
-        fileCompat.documentMimeType, fileCompat.documentFlags
-    )
 
     /**
      * Cannot create a File without a Parent Directory Uri.
@@ -78,5 +70,30 @@ internal class SingleDocumentFileCompat(
         val inputStream = context.contentResolver.openInputStream(source)!!
         val outputStream = context.contentResolver.openOutputStream(uri)!!
         inputStream.use { stream -> stream.copyTo(outputStream) }
+    }
+
+    internal companion object {
+
+        /**
+         * Extracted in to a separate companion method to not clutter common code while running the
+         * **ContentResolver Queries**.
+         */
+        internal fun make(
+            context: Context,
+            cursor: Cursor, documentUri: Uri,
+        ): SingleDocumentFileCompat {
+            // cursor.getString(0) is the documentId
+            val documentName: String = cursor.getString(1)
+            val documentSize: Long = cursor.getLong(2)
+            val documentLastModified: Long = cursor.getLong(3)
+            val documentMimeType: String = cursor.getString(4)
+            val documentFlags: Int = cursor.getLong(5).toInt()
+
+            return SingleDocumentFileCompat(
+                context, documentUri.toString(),
+                documentName, documentSize,
+                documentLastModified, documentMimeType, documentFlags
+            )
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.lazygeniouz.dfc.file.internals
 
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
 import com.lazygeniouz.dfc.extension.findFile
@@ -12,7 +13,7 @@ import com.lazygeniouz.dfc.file.DocumentFileCompat
  *
  * For example: Listing files in a Directory, Creating Files & Directories, etc.
  *
- * @param context Context required by the FileCompat internally.
+ * @param context Context required by the DocumentFileCompat internally.
  *
  * Other params same as [DocumentFileCompat].
  */
@@ -25,24 +26,12 @@ internal class TreeDocumentFileCompat constructor(
 ) {
 
     /**
-     * Secondary constructor for easy initialization from the [DocumentFileCompat.fromTreeUri].
-     */
-    internal constructor(
-        context: Context,
-        fileCompat: DocumentFileCompat,
-    ) : this(
-        context, fileCompat.path,
-        fileCompat.name, fileCompat.length,
-        fileCompat.lastModified, fileCompat.documentMimeType, fileCompat.documentFlags
-    )
-
-    /**
      * Create a document file.
      *
      * @param mimeType Type of the file, e.g: text/plain.
      * @param name The name of the file.
      *
-     * @return A FileCompat object if file was created successfully, **null** otherwise.
+     * @return A DocumentFileCompat object if file was created successfully, **null** otherwise.
      */
     override fun createFile(mimeType: String, name: String): DocumentFileCompat? {
         val treeFileUri = fileController.createFile(mimeType, name)
@@ -54,7 +43,7 @@ internal class TreeDocumentFileCompat constructor(
      *
      * @param name The name of the file.
      *
-     * @return A FileCompat object if directory was created successfully, **null** otherwise.
+     * @return A DocumentFileCompat object if directory was created successfully, **null** otherwise.
      */
     override fun createDirectory(name: String): DocumentFileCompat? {
         val treeFileUri = fileController.createFile(MIME_TYPE_DIR, name)
@@ -87,5 +76,30 @@ internal class TreeDocumentFileCompat constructor(
      */
     override fun copyFrom(source: Uri) {
         throw UnsupportedOperationException("Cannot open a stream on a tree")
+    }
+
+    internal companion object {
+
+        /**
+         * Extracted in to a separate companion method to not clutter common code while running the
+         * **ContentResolver Queries**.
+         */
+        internal fun make(
+            context: Context,
+            cursor: Cursor, documentUri: Uri,
+        ): TreeDocumentFileCompat {
+            // cursor.getString(0) is the documentId
+            val documentName: String = cursor.getString(1)
+            val documentSize: Long = cursor.getLong(2)
+            val documentLastModified: Long = cursor.getLong(3)
+            val documentMimeType: String = cursor.getString(4)
+            val documentFlags: Int = cursor.getLong(5).toInt()
+
+            return TreeDocumentFileCompat(
+                context, documentUri.toString(),
+                documentName, documentSize,
+                documentLastModified, documentMimeType, documentFlags
+            )
+        }
     }
 }
