@@ -7,8 +7,6 @@ import android.provider.DocumentsContract.isDocumentUri
 import com.lazygeniouz.dfc.controller.DocumentController
 import com.lazygeniouz.dfc.extension.toSerializedList
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
-import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
-import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 import java.io.File
 
@@ -25,7 +23,7 @@ abstract class DocumentFileCompat constructor(
     open val length: Long = 0,
     val lastModified: Long = -1L,
     internal val documentFlags: Int = -1,
-    internal val documentMimeType: String = ""
+    internal val documentMimeType: String = "",
 ) {
 
     // Secondary constructor for java.io.File type
@@ -47,7 +45,7 @@ abstract class DocumentFileCompat constructor(
      * @param mimeType Type of the file, e.g: text/plain.
      * @param name The name of the file.
      *
-     * @return A FileCompat object if file was created successfully, **null** otherwise.
+     * @return A DocumentFileCompat object if file was created successfully, **null** otherwise.
      */
     abstract fun createFile(mimeType: String, name: String): DocumentFileCompat?
 
@@ -56,7 +54,7 @@ abstract class DocumentFileCompat constructor(
      *
      * @param name The name of the file.
      *
-     * @return A FileCompat object if directory was created successfully, **null** otherwise.
+     * @return A DocumentFileCompat object if directory was created successfully, **null** otherwise.
      */
     abstract fun createDirectory(name: String): DocumentFileCompat?
 
@@ -178,10 +176,9 @@ abstract class DocumentFileCompat constructor(
          * @param context Required for queries to [ContentResolver]
          * @param uri uri which will be queried
          */
+        @JvmStatic
         fun fromTreeUri(context: Context, uri: Uri): DocumentFileCompat? {
-            val fileCompat = ResolverCompat(context, uri).getInitialFileCompat(true)
-            return if (fileCompat != null) TreeDocumentFileCompat(context, fileCompat)
-            else null
+            return ResolverCompat(context, uri).getInitialFileCompat(true)
         }
 
         /**
@@ -190,10 +187,9 @@ abstract class DocumentFileCompat constructor(
          * @param context Required for queries to [ContentResolver]
          * @param uri Uri which will be queried
          */
+        @JvmStatic
         fun fromSingleUri(context: Context, uri: Uri): DocumentFileCompat? {
-            val fileCompat = ResolverCompat(context, uri).getInitialFileCompat(false)
-            return if (fileCompat != null) SingleDocumentFileCompat(context, fileCompat)
-            else null
+            return ResolverCompat(context, uri).getInitialFileCompat(false)
         }
 
         /**
@@ -202,6 +198,7 @@ abstract class DocumentFileCompat constructor(
          * RawDocumentFileCompat serves as an alternative to the **RawDocumentFile**
          * which handles Documents using the native [File] api.
          */
+        @JvmStatic
         fun fromFile(context: Context, file: File): DocumentFileCompat {
             return RawDocumentFileCompat(context, file)
         }
@@ -209,6 +206,7 @@ abstract class DocumentFileCompat constructor(
         /**
          * Test if given Uri is backed by a [android.provider.DocumentsProvider].
          */
+        @JvmStatic
         fun isDocument(context: Context, uri: Uri): Boolean {
             return isDocumentUri(context, uri)
         }
