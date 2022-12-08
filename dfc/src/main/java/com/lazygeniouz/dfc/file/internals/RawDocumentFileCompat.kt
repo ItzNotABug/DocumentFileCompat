@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import com.lazygeniouz.dfc.extension.findFile
+import com.lazygeniouz.dfc.extension.logError
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import java.io.File
 
@@ -81,7 +82,7 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
         } else false
     }
 
-    // Create file & return a FileCompat (RawFileCompat),
+    // Create file & return a DocumentFileCompat (RawFileCompat),
     // can be null if there was an Exception.
     override fun createFile(mimeType: String, name: String): DocumentFileCompat? {
         var displayName = name
@@ -95,12 +96,12 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
             if (target.createNewFile()) fromFile(context, target)
             else null
         } catch (exception: Exception) {
-            println("DocumentFileCompat: Exception while creating a document = ${exception.message}")
+            logError("Exception while creating a document: ${exception.message}")
             null
         }
     }
 
-    // Create a Directory & return a FileCompat (RawFileCompat),
+    // Create a Directory & return a DocumentFileCompat (RawFileCompat),
     // can be null if there was an Exception.
     override fun createDirectory(name: String): DocumentFileCompat? {
         val target = File(file, name)
