@@ -23,7 +23,7 @@ allprojects {
 
     plugins.withId("com.vanniktech.maven.publish.base") {
         group "com.lazygeniouz"
-        version "0.9"
+        version "0.91"
 
         mavenPublishing {
             signAllPublications()
