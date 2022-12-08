@@ -184,7 +184,12 @@ internal class ResolverCompat(
 
         getCursor(childrenUri, fullProjection)?.use { cursor ->
             while (cursor.moveToNext()) {
-                val treeDocumentFileCompat = TreeDocumentFileCompat.make(context, cursor, treeUri)
+                val documentId: String = cursor.getString(0)
+                val documentUri: Uri = DocumentsContract.buildDocumentUriUsingTree(
+                    getTreeUri(uri), documentId
+                )
+
+                val treeDocumentFileCompat = TreeDocumentFileCompat.make(context, cursor, documentUri)
                 listOfDocuments.add(treeDocumentFileCompat)
             }
         }
