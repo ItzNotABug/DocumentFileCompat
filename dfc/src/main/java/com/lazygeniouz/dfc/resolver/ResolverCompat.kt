@@ -4,8 +4,8 @@ import android.content.ContentResolver
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
-import android.provider.DocumentsContract.*
-import android.provider.DocumentsContract.Document.*
+import android.provider.DocumentsContract
+import com.lazygeniouz.dfc.extension.logError
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
@@ -17,21 +17,19 @@ import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
  */
 internal class ResolverCompat(
     private val context: Context,
-    private val uri: Uri
+    private val uri: Uri,
 ) {
 
-    private val tag = "DocumentFileCompat"
-
     // Projections
-    private val _idProjection = COLUMN_DOCUMENT_ID
+    private val _idProjection = DocumentsContract.Document.COLUMN_DOCUMENT_ID
     private val documentIdProjection = arrayOf(_idProjection)
     private val fullProjection = arrayOf(
         _idProjection,
-        COLUMN_DISPLAY_NAME,
-        COLUMN_SIZE,
-        COLUMN_LAST_MODIFIED,
-        COLUMN_MIME_TYPE,
-        COLUMN_FLAGS
+        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        DocumentsContract.Document.COLUMN_SIZE,
+        DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+        DocumentsContract.Document.COLUMN_MIME_TYPE,
+        DocumentsContract.Document.COLUMN_FLAGS
     )
 
     // The star of the show!
@@ -44,9 +42,9 @@ internal class ResolverCompat(
      */
     internal fun deleteDocument(): Boolean {
         return try {
-            deleteDocument(contentResolver, uri)
+            DocumentsContract.deleteDocument(contentResolver, uri)
         } catch (exception: Exception) {
-            println("$tag: Exception while deleting document = ${exception.message}")
+            logError("Exception while deleting document: ${exception.message}")
             false
         }
     }
@@ -58,9 +56,9 @@ internal class ResolverCompat(
      */
     internal fun renameTo(name: String): Boolean {
         return try {
-            (renameDocument(contentResolver, uri, name) != null)
+            (DocumentsContract.renameDocument(contentResolver, uri, name) != null)
         } catch (exception: Exception) {
-            println("$tag: Exception while renaming document = ${exception.message}")
+            logError("Exception while renaming document: ${exception.message}")
             false
         }
     }
@@ -75,30 +73,30 @@ internal class ResolverCompat(
      */
     internal fun createFile(mimeType: String, name: String): Uri? {
         return try {
-            createDocument(contentResolver, uri, mimeType, name)
+            DocumentsContract.createDocument(contentResolver, uri, mimeType, name)
         } catch (exception: Exception) {
-            println("$tag: Exception while creating a document = ${exception.message}")
+            logError("Exception while creating a document: ${exception.message}")
             null
         }
     }
 
     /**
-     * Queries the ContentResolver & builds a relevant [DocumentFileCompat] all the fields.
+     * Queries the ContentResolver & builds a list of [DocumentFileCompat] with all the required fields.
      */
-    internal fun queryForFileCompat(): List<DocumentFileCompat> {
+    internal fun queryAndMakeDocumentList(): List<DocumentFileCompat> {
         return runTreeQuery()
     }
 
     // Build relevant Tree Uri.
     private fun getTreeUri(uri: Uri): Uri {
-        val isDocument = isDocumentUri(context, uri)
-        val correctUri = if (isDocument) getDocumentId(uri)
-        else getTreeDocumentId(uri)
-        return buildDocumentUriUsingTree(uri, correctUri)
+        val isDocument = DocumentsContract.isDocumentUri(context, uri)
+        val correctUri = if (isDocument) DocumentsContract.getDocumentId(uri)
+        else DocumentsContract.getTreeDocumentId(uri)
+        return DocumentsContract.buildDocumentUriUsingTree(uri, correctUri)
     }
 
-    // Returns True if the Uri is a Tree Uri, false otherwise.
-    internal fun isTreeUri(): Boolean {
+    // Returns True if the Uri is a Tree Uri, False otherwise.
+    private fun isTreeUri(): Boolean {
         val paths = uri.pathSegments
         return paths.size >= 2 && "tree" == paths[0]
     }
@@ -113,7 +111,7 @@ internal class ResolverCompat(
      */
     internal fun getInitialFileCompat(isTree: Boolean): DocumentFileCompat? {
         if (isTree && !isTreeUri())
-            throw UnsupportedOperationException("Document Uri is not a Directory.")
+            throw UnsupportedOperationException("Document Uri is not a Tree uri.")
         return runInitialQuery(isTree)
     }
 
@@ -145,35 +143,29 @@ internal class ResolverCompat(
      * @param isTree Returns a [TreeDocumentFileCompat] if True, [SingleDocumentFileCompat] otherwise.
      */
     private fun runInitialQuery(isTree: Boolean): DocumentFileCompat? {
-        val uriToUse = if (!isTree) uri
+        val uriToQuery = if (!isTree) uri
         else {
-            val treeUri = getTreeUri(uri)
-            buildDocumentUriUsingTree(treeUri, getDocumentId(treeUri))
+            val treeUri = this.getTreeUri(uri)
+            val documentId = DocumentsContract.getDocumentId(treeUri)
+            DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
         }
 
-        var singleDocument: DocumentFileCompat? = null
+        var document: DocumentFileCompat? = null
 
-        getCursor(uriToUse, fullProjection)?.use { cursor ->
+        getCursor(uriToQuery, fullProjection)?.use { cursor ->
             if (cursor.moveToFirst()) {
+                val treeUri = this.getTreeUri(uri)
                 val documentId: String = cursor.getString(0)
                 val documentUri: Uri = if (!isTree) uri
-                else buildDocumentUriUsingTree(getTreeUri(uri), documentId)
+                else DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
 
-                val documentName: String = cursor.getString(1)
-                val documentSize: Long = cursor.getLong(2)
-                val documentLastModified: Long = cursor.getLong(3)
-                val documentMimeType: String = cursor.getString(4)
-                val documentFlags: Int = cursor.getLong(5).toInt()
-                singleDocument = SingleDocumentFileCompat(
-                    context, documentUri.toString(),
-                    documentName, documentSize,
-                    documentLastModified,
-                    documentMimeType, documentFlags
-                )
+                // Same logic but moved to separate classes for easy readability & understanding.
+                document = if (!isTree) SingleDocumentFileCompat.make(context, cursor, documentUri)
+                else TreeDocumentFileCompat.make(context, cursor, documentUri)
             }
         }
 
-        return singleDocument
+        return document
     }
 
     /**
@@ -182,8 +174,9 @@ internal class ResolverCompat(
      * @return A list of [DocumentFileCompat] with all fields.
      */
     private fun runTreeQuery(): ArrayList<DocumentFileCompat> {
-        val childrenUri = buildChildDocumentsUriUsingTree(
-            getTreeUri(uri), getDocumentId(getTreeUri(uri))
+        val treeUri = this.getTreeUri(uri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+            treeUri, DocumentsContract.getDocumentId(treeUri)
         )
 
         // empty list
@@ -191,23 +184,8 @@ internal class ResolverCompat(
 
         getCursor(childrenUri, fullProjection)?.use { cursor ->
             while (cursor.moveToNext()) {
-                val documentId: String = cursor.getString(0)
-                val documentUri: Uri = buildDocumentUriUsingTree(
-                    getTreeUri(uri), documentId
-                )
-
-                val documentName: String = cursor.getString(1)
-                val documentSize: Long = cursor.getLong(2)
-                val documentLastModified: Long = cursor.getLong(3)
-                val documentMimeType: String = cursor.getString(4)
-                val documentFlags: Int = cursor.getLong(5).toInt()
-                listOfDocuments.add(
-                    TreeDocumentFileCompat(
-                        context, documentUri.toString(),
-                        documentName, documentSize,
-                        documentLastModified, documentMimeType, documentFlags
-                    )
-                )
+                val treeDocumentFileCompat = TreeDocumentFileCompat.make(context, cursor, treeUri)
+                listOfDocuments.add(treeDocumentFileCompat)
             }
         }
 
