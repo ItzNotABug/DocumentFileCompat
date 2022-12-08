@@ -16,11 +16,11 @@ import com.lazygeniouz.dfc.resolver.ResolverCompat
  * This controller handles [Uri] & [DocumentFileCompat] building via [ResolverCompat].
  *
  * @param context Required for queries to [ContentResolver]
- * @param fileCompat For accessing FileCompat data
+ * @param fileCompat For accessing DocumentFileCompat data
  */
 internal class DocumentController(
     private val context: Context,
-    private val fileCompat: DocumentFileCompat
+    private val fileCompat: DocumentFileCompat,
 ) {
 
     // DocumentsContract API level 24.
@@ -35,7 +35,7 @@ internal class DocumentController(
     internal fun listFiles(): List<DocumentFileCompat> {
         return if (!isDirectory())
             throw UnsupportedOperationException("Selected document is not a Directory.")
-        else resolverCompat.queryForFileCompat()
+        else resolverCompat.queryAndMakeDocumentList()
     }
 
     /**
@@ -68,7 +68,7 @@ internal class DocumentController(
      * Returns True if the Document is a Directory
      */
     internal fun isDirectory(): Boolean {
-        return MIME_TYPE_DIR == fileCompat.documentMimeType || resolverCompat.isTreeUri()
+        return MIME_TYPE_DIR == fileCompat.documentMimeType
     }
 
     /**
