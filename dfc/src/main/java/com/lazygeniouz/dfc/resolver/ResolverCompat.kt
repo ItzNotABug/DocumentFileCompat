@@ -154,10 +154,13 @@ internal class ResolverCompat(
 
         getCursor(uriToQuery, fullProjection)?.use { cursor ->
             if (cursor.moveToFirst()) {
-                val treeUri = this.getTreeUri(uri)
                 val documentId: String = cursor.getString(0)
-                val documentUri: Uri = if (!isTree) uri
-                else DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+                val documentUri: Uri = if (!isTree) {
+                    uri
+                } else {
+                    val treeUri = this.getTreeUri(uri)
+                    DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+                }
 
                 // Same logic but moved to separate classes for easy readability & understanding.
                 document = if (!isTree) SingleDocumentFileCompat.make(context, cursor, documentUri)
@@ -189,7 +192,8 @@ internal class ResolverCompat(
                     getTreeUri(uri), documentId
                 )
 
-                val treeDocumentFileCompat = TreeDocumentFileCompat.make(context, cursor, documentUri)
+                val treeDocumentFileCompat =
+                    TreeDocumentFileCompat.make(context, cursor, documentUri)
                 listOfDocuments.add(treeDocumentFileCompat)
             }
         }
