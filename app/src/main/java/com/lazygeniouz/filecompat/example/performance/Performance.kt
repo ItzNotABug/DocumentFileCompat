@@ -2,10 +2,8 @@ package com.lazygeniouz.filecompat.example.performance
 
 import android.content.Context
 import android.net.Uri
-import java.util.*
 import kotlin.system.measureTimeMillis
 
-@Suppress("deprecation")
 object Performance {
 
     private val Long.toSeconds get() = (this / 1000.00)

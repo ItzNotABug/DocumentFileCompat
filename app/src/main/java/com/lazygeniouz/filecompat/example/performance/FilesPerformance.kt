@@ -11,7 +11,6 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
-@Suppress("deprecation")
 object FilesPerformance {
 
     fun calculateFileSidePerformance(context: Context, uri: Uri): String {
@@ -39,14 +38,11 @@ object FilesPerformance {
     private fun calculateFileCompatPerformance(context: Context, uri: Uri): String {
         var message = ""
         measureTimeSeconds {
-            val usableUri = Performance.getUsablePath(uri)
-            val file = File(Environment.getExternalStorageDirectory(), usableUri)
-            val fileCompat = DocumentFileCompat.fromFile(context, file)
+            val file = DocumentFileCompat.fromSingleUri(context, uri) ?: return@measureTimeSeconds
             message = buildString(
-                fileCompat.name,
-                fileCompat.extension,
-                fileCompat.lastModified,
-                fileCompat.length)
+                file.name, file.extension,
+                file.lastModified, file.length
+            )
         }.also { time ->
             message = "$message\nDFC Performance = ${time}s"
             return (message)
@@ -58,10 +54,12 @@ object FilesPerformance {
         var message = ""
         measureTimeSeconds {
             val documentFile = DocumentFile.fromSingleUri(context, uri)
-            message = buildString(documentFile?.name!!,
+            message = buildString(
+                documentFile?.name!!,
                 documentFile.name!!.substringAfterLast("."),
                 documentFile.lastModified(),
-                documentFile.length())
+                documentFile.length()
+            )
         }.also { time ->
             message = "$message\nDocumentFile Performance = ${time}s"
             return (message)

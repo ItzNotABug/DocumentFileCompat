@@ -79,7 +79,8 @@ object DirectoryPerformance {
             val files = DocumentFileCompat.fromFile(context, file).listFiles()
             size = files.size
         }.also { time ->
-            val message = "Folder has $size items.\nRawFileCompat Performance = ${time}s"
+            // building a DFC model with File will take a few ms against the native perf.
+            val message = "Folder has $size items.\nDFC (File API) Performance = ${time}s"
             return (message)
         }
     }
@@ -98,14 +99,16 @@ object DirectoryPerformance {
         measureTimeSeconds {
             val listOfUsableElements = arrayListOf<Performance.FileHolderPojo>()
             DocumentFile.fromTreeUri(context, uri)?.listFiles()?.forEach { documentFile ->
-                listOfUsableElements.add(Performance.FileHolderPojo(
-                    documentFile.uri,
-                    // Each of this will call ContentResolver
-                    documentFile.name.orEmpty(),
-                    documentFile.length().toInt(),
-                    documentFile.lastModified(),
-                    documentFile.type.orEmpty(),
-                ))
+                listOfUsableElements.add(
+                    Performance.FileHolderPojo(
+                        documentFile.uri,
+                        // Each of this will call ContentResolver
+                        documentFile.name.orEmpty(),
+                        documentFile.length().toInt(),
+                        documentFile.lastModified(),
+                        documentFile.type.orEmpty(),
+                    )
+                )
             }
         }.also { time -> return ("DocumentFile Performance = ${time}s") }
     }
