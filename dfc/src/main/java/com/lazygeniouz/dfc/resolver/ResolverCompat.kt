@@ -87,14 +87,6 @@ internal class ResolverCompat(
         return runTreeQuery()
     }
 
-    // Build relevant Tree Uri.
-    private fun getTreeUri(): Uri {
-        val isDocument = DocumentsContract.isDocumentUri(context, uri)
-        val correctUri = if (isDocument) DocumentsContract.getDocumentId(uri)
-        else DocumentsContract.getTreeDocumentId(uri)
-        return DocumentsContract.buildDocumentUriUsingTree(uri, correctUri)
-    }
-
     // Returns True if the Uri is a Tree Uri, False otherwise.
     private fun isTreeUri(): Boolean {
         val paths = uri.pathSegments
@@ -119,17 +111,8 @@ internal class ResolverCompat(
      * Returns True if the Document Folder / File exists, False otherwise.
      */
     internal fun exists(): Boolean {
-        var exists = false
-        getCursor(uri, documentIdProjection)?.let { cursor ->
-            exists = try {
-                cursor.count > 0
-            } catch (exception: Exception) {
-                false
-            } finally {
-                cursor.close()
-            }
-        }
-        return exists
+        getCursor(uri, documentIdProjection)?.use { cursor -> return (cursor.count > 0) }
+        return false
     }
 
     // Get a Cursor to query the given Uri against provided projection
@@ -144,11 +127,9 @@ internal class ResolverCompat(
      */
     private fun runInitialQuery(isTree: Boolean): DocumentFileCompat? {
         val uriToQuery = if (!isTree) uri
-        else {
-            val treeUri = getTreeUri()
-            val documentId = DocumentsContract.getDocumentId(treeUri)
-            DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
-        }
+        else DocumentsContract.buildDocumentUriUsingTree(
+            uri, DocumentsContract.getTreeDocumentId(uri)
+        )
 
         var document: DocumentFileCompat? = null
 
@@ -156,7 +137,7 @@ internal class ResolverCompat(
             if (cursor.moveToFirst()) {
                 val documentId: String = cursor.getString(0)
                 val documentUri: Uri = if (!isTree) uri
-                else DocumentsContract.buildDocumentUriUsingTree(getTreeUri(), documentId)
+                else DocumentsContract.buildDocumentUriUsingTree(uriToQuery, documentId)
 
                 // Same logic but moved to separate classes for easy readability & understanding.
                 document = if (!isTree) SingleDocumentFileCompat.make(context, cursor, documentUri)
@@ -173,9 +154,8 @@ internal class ResolverCompat(
      * @return A list of [DocumentFileCompat] with all fields.
      */
     private fun runTreeQuery(): List<DocumentFileCompat> {
-        val treeUri = getTreeUri()
-        val documentId = DocumentsContract.getDocumentId(treeUri)
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId)
+        val documentId = DocumentsContract.getDocumentId(uri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(uri, documentId)
 
         // empty list
         val listOfDocuments = arrayListOf<DocumentFileCompat>()
@@ -183,7 +163,7 @@ internal class ResolverCompat(
         getCursor(childrenUri, fullProjection)?.use { cursor ->
             while (cursor.moveToNext()) {
                 val docId: String = cursor.getString(0)
-                val docUri = DocumentsContract.buildDocumentUriUsingTree(getTreeUri(), docId)
+                val docUri = DocumentsContract.buildDocumentUriUsingTree(uri, docId)
                 listOfDocuments.add(TreeDocumentFileCompat.make(context, cursor, docUri))
             }
         }
