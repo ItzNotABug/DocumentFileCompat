@@ -5,7 +5,6 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract.isDocumentUri
 import com.lazygeniouz.dfc.controller.DocumentController
-import com.lazygeniouz.dfc.extension.toSerializedList
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 import java.io.File
@@ -60,7 +59,9 @@ abstract class DocumentFileCompat constructor(
 
     /**
      * This will return a list of [DocumentFileCompat] with all the defined fields
-     * only when the current document is a **Directory**, **null** otherwise
+     * only when the current document is a **Directory**.
+     *
+     * A [UnsupportedOperationException] is thrown if the uri is not a directory.
      */
     abstract fun listFiles(): List<DocumentFileCompat>
 
@@ -169,10 +170,8 @@ abstract class DocumentFileCompat constructor(
 
     /**
      * Converts a non serializable [DocumentFileCompat] to a serializable [SerializedFile].
-     *
-     * To convert a list of [DocumentFileCompat] to a list of [Serializable],
-     * use [toSerializedList] on a `List<DocumentFileCompat>`
      */
+    @Suppress("unused")
     fun serialize(): SerializedFile {
         return SerializedFile.from(this)
     }
