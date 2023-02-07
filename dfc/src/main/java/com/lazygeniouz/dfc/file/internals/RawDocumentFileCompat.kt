@@ -111,9 +111,7 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
 
     // Performance of File api is pretty great as compared to others.
     override fun listFiles(): List<DocumentFileCompat> {
-        val filesList = arrayListOf<DocumentFileCompat>()
-        file.listFiles()?.onEach { child -> filesList.add(fromFile(context, child)) }
-        return filesList
+        return file.listFiles()?.map { child -> fromFile(context, child) } ?: emptyList()
     }
 
     /**
