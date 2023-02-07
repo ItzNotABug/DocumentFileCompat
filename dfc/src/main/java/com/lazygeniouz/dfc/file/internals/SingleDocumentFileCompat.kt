@@ -50,6 +50,13 @@ internal class SingleDocumentFileCompat(
     }
 
     /**
+     * Not a Directory, no children, no count.
+     */
+    override fun count(): Int {
+        return 0
+    }
+
+    /**
      * No [listFiles] so no iterating to search for something..
      *
      * @throws UnsupportedOperationException

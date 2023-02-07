@@ -39,6 +39,15 @@ internal class DocumentController(
     }
 
     /**
+     * This will return the children count in the directory.
+     * More optimised than using [List.size] via [listFiles].
+     */
+    internal fun count(): Int {
+        return if (!isDirectory()) 0
+        else resolverCompat.count()
+    }
+
+    /**
      * Returns True if the Document Folder / File exists, False otherwise.
      */
     internal fun exists(): Boolean {

@@ -65,6 +65,15 @@ abstract class DocumentFileCompat constructor(
     abstract fun listFiles(): List<DocumentFileCompat>
 
     /**
+     * This will return the children count inside a **Directory** without creating [DocumentFileCompat] objects.
+     *
+     * Returns **0** if the uri is not a directory or if the object at uri is null.
+     *
+     * **Note: You should use [listFiles] if you are gonna need them later.**
+     */
+    abstract fun count(): Int
+
+    /**
      * Find a File against the given name.
      *
      *
@@ -207,6 +216,7 @@ abstract class DocumentFileCompat constructor(
          * Test if given Uri is backed by a [android.provider.DocumentsProvider].
          */
         @JvmStatic
+        @Suppress("unused")
         fun isDocument(context: Context, uri: Uri): Boolean {
             return isDocumentUri(context, uri)
         }

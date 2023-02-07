@@ -116,6 +116,16 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
         return filesList
     }
 
+    /**
+     * This will return the children count in the directory.
+     *
+     * [File] api is usually fast but may slow down if there are a lot of children in the directory..
+     *
+     */
+    override fun count(): Int {
+        return file.listFiles()?.size ?: 0
+    }
+
     // Return a file if exists, else **null**
     override fun findFile(name: String): DocumentFileCompat? {
         return listFiles().findFile(name)

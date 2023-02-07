@@ -87,6 +87,23 @@ internal class ResolverCompat(
         return runTreeQuery()
     }
 
+    /**
+     * Returns the children count without creating [DocumentFileCompat] objects.
+     *
+     * **Local Test Result**: [DocumentsContract.Document.COLUMN_ICON] was the fastest on a directory
+     * of 824 items, more than 2x against `listFiles().size`.
+     *
+     * - Min: 0.275, Max: 0.613 (listFiles().size)
+     * - Avg: 0.444, Diff: 0.338, % Change: 55.14
+     */
+    internal fun count(): Int {
+        val documentId = DocumentsContract.getDocumentId(uri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(uri, documentId)
+        val projection = arrayOf(DocumentsContract.Document.COLUMN_ICON)
+        getCursor(childrenUri, projection)?.use { cursor -> return cursor.count }
+        return 0
+    }
+
     // Returns True if the Uri is a Tree Uri, False otherwise.
     private fun isTreeUri(): Boolean {
         val paths = uri.pathSegments

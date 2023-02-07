@@ -58,6 +58,16 @@ internal class TreeDocumentFileCompat constructor(
     }
 
     /**
+     * This will return the children count in the directory.
+     *
+     * More optimised than using [List.size] via [listFiles].
+     *
+     */
+    override fun count(): Int {
+        return fileController.count()
+    }
+
+    /**
      * Return a file if exists, else **null**.
      */
     override fun findFile(name: String): DocumentFileCompat? {
