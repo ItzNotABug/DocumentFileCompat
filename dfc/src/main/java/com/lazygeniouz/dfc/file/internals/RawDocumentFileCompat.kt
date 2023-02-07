@@ -3,7 +3,6 @@ package com.lazygeniouz.dfc.file.internals
 import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
-import com.lazygeniouz.dfc.extension.findFile
 import com.lazygeniouz.dfc.extension.logError
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import java.io.File
@@ -126,7 +125,7 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
 
     // Return a file if exists, else **null**
     override fun findFile(name: String): DocumentFileCompat? {
-        return listFiles().findFile(name)
+        return listFiles().firstOrNull { file -> file.name.isNotEmpty() && file.name == name }
     }
 
     // Copies current file to the provided destination uri.

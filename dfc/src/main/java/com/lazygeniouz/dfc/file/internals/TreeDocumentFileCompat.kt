@@ -4,7 +4,6 @@ import android.content.Context
 import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
-import com.lazygeniouz.dfc.extension.findFile
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 
 /**
@@ -71,7 +70,7 @@ internal class TreeDocumentFileCompat constructor(
      * Return a file if exists, else **null**.
      */
     override fun findFile(name: String): DocumentFileCompat? {
-        return listFiles().findFile(name)
+        return listFiles().firstOrNull { file -> file.name.isNotEmpty() && file.name == name }
     }
 
     /**
