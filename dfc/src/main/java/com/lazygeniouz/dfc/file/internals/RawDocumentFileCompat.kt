@@ -3,8 +3,8 @@ package com.lazygeniouz.dfc.file.internals
 import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
-import com.lazygeniouz.dfc.extension.logError
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.logger.ErrorLogger.logError
 import java.io.File
 
 /**
@@ -95,7 +95,7 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
             if (target.createNewFile()) fromFile(context, target)
             else null
         } catch (exception: Exception) {
-            logError("Exception while creating a document: ${exception.message}")
+            logError("Exception while creating a document", exception)
             null
         }
     }

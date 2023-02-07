@@ -5,10 +5,10 @@ import android.content.Context
 import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract
-import com.lazygeniouz.dfc.extension.logError
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.logger.ErrorLogger.logError
 
 /**
  * This class calls relevant queries on the [ContentResolver]
@@ -44,7 +44,7 @@ internal class ResolverCompat(
         return try {
             DocumentsContract.deleteDocument(contentResolver, uri)
         } catch (exception: Exception) {
-            logError("Exception while deleting document: ${exception.message}")
+            logError("Exception while deleting document", exception)
             false
         }
     }
@@ -58,7 +58,7 @@ internal class ResolverCompat(
         return try {
             (DocumentsContract.renameDocument(contentResolver, uri, name) != null)
         } catch (exception: Exception) {
-            logError("Exception while renaming document: ${exception.message}")
+            logError("Exception while renaming document", exception)
             false
         }
     }
@@ -75,7 +75,7 @@ internal class ResolverCompat(
         return try {
             DocumentsContract.createDocument(contentResolver, uri, mimeType, name)
         } catch (exception: Exception) {
-            logError("Exception while creating a document: ${exception.message}")
+            logError("Exception while creating a document", exception)
             null
         }
     }
