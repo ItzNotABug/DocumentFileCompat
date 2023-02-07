@@ -97,8 +97,7 @@ internal class ResolverCompat(
      * - Avg: 0.444, Diff: 0.338, % Change: 55.14
      */
     internal fun count(): Int {
-        val documentId = DocumentsContract.getDocumentId(uri)
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(uri, documentId)
+        val childrenUri = buildChildDocumentsUriUsingTree()
         val projection = arrayOf(DocumentsContract.Document.COLUMN_ICON)
         getCursor(childrenUri, projection)?.use { cursor -> return cursor.count }
         return 0
@@ -108,6 +107,12 @@ internal class ResolverCompat(
     private fun isTreeUri(): Boolean {
         val paths = uri.pathSegments
         return paths.size >= 2 && "tree" == paths[0]
+    }
+
+    // Create a child document uri from the tree uri.
+    private fun buildChildDocumentsUriUsingTree(): Uri {
+        val documentId = DocumentsContract.getDocumentId(uri)
+        return DocumentsContract.buildChildDocumentsUriUsingTree(uri, documentId)
     }
 
     /**
@@ -171,8 +176,7 @@ internal class ResolverCompat(
      * @return A list of [DocumentFileCompat] with all fields.
      */
     private fun runTreeQuery(): List<DocumentFileCompat> {
-        val documentId = DocumentsContract.getDocumentId(uri)
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(uri, documentId)
+        val childrenUri = buildChildDocumentsUriUsingTree()
 
         // empty list
         val listOfDocuments = arrayListOf<DocumentFileCompat>()
