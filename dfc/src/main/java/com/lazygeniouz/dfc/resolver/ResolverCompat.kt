@@ -111,8 +111,18 @@ internal class ResolverCompat(
 
     // Create a child document uri from the tree uri.
     private fun buildChildDocumentsUriUsingTree(): Uri {
-        val documentId = DocumentsContract.getDocumentId(uri)
-        return DocumentsContract.buildChildDocumentsUriUsingTree(uri, documentId)
+        return DocumentsContract.buildChildDocumentsUriUsingTree(
+            getTreeUri(), DocumentsContract.getDocumentId(getTreeUri())
+        )
+    }
+
+    // Build relevant Tree Uri.
+    private fun getTreeUri(): Uri {
+        val isDocument = DocumentsContract.isDocumentUri(context, uri)
+        return DocumentsContract.buildDocumentUriUsingTree(
+            uri, if (isDocument) DocumentsContract.getDocumentId(uri)
+            else DocumentsContract.getTreeDocumentId(uri)
+        )
     }
 
     /**
@@ -150,7 +160,7 @@ internal class ResolverCompat(
     private fun runInitialQuery(isTree: Boolean): DocumentFileCompat? {
         val uriToQuery = if (!isTree) uri
         else DocumentsContract.buildDocumentUriUsingTree(
-            uri, DocumentsContract.getTreeDocumentId(uri)
+            getTreeUri(), DocumentsContract.getDocumentId(getTreeUri())
         )
 
         var document: DocumentFileCompat? = null
@@ -159,7 +169,7 @@ internal class ResolverCompat(
             if (cursor.moveToFirst()) {
                 val documentId: String = cursor.getString(0)
                 val documentUri: Uri = if (!isTree) uri
-                else DocumentsContract.buildDocumentUriUsingTree(uriToQuery, documentId)
+                else DocumentsContract.buildDocumentUriUsingTree(getTreeUri(), documentId)
 
                 // Same logic but moved to separate classes for easy readability & understanding.
                 document = if (!isTree) SingleDocumentFileCompat.make(context, cursor, documentUri)
@@ -184,7 +194,7 @@ internal class ResolverCompat(
         getCursor(childrenUri, fullProjection)?.use { cursor ->
             while (cursor.moveToNext()) {
                 val docId: String = cursor.getString(0)
-                val docUri = DocumentsContract.buildDocumentUriUsingTree(uri, docId)
+                val docUri = DocumentsContract.buildDocumentUriUsingTree(getTreeUri(), docId)
                 listOfDocuments.add(TreeDocumentFileCompat.make(context, cursor, docUri))
             }
         }
