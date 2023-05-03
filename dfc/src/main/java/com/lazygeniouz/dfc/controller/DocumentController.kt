@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
-import android.provider.DocumentsContract.isDocumentUri
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 
@@ -26,8 +25,8 @@ internal class DocumentController(
     // DocumentsContract API level 24.
     private val flagVirtualDocument = 1 shl 9
 
-    // File Handler to call delegate functions.
-    private val resolverCompat by lazy { ResolverCompat(context, fileCompat.uri) }
+    // Uri of the given [DocumentFileCompat]
+    private val fileUri get() = fileCompat.uri
 
     /**
      * This will return a list of [DocumentFileCompat] with all the defined fields.
@@ -35,23 +34,24 @@ internal class DocumentController(
     internal fun listFiles(): List<DocumentFileCompat> {
         return if (!isDirectory())
             throw UnsupportedOperationException("Selected document is not a Directory.")
-        else resolverCompat.queryAndMakeDocumentList()
+        else ResolverCompat.listFiles(context, fileUri)
     }
 
     /**
      * This will return the children count in the directory.
+     *
      * More optimised than using [List.size] via [listFiles].
      */
     internal fun count(): Int {
         return if (!isDirectory()) 0
-        else resolverCompat.count()
+        else ResolverCompat.count(context, fileUri)
     }
 
     /**
      * Returns True if the Document Folder / File exists, False otherwise.
      */
     internal fun exists(): Boolean {
-        return resolverCompat.exists()
+        return ResolverCompat.exists(context, fileUri)
     }
 
     /**
@@ -61,7 +61,7 @@ internal class DocumentController(
      * and doesn't have byte representation in the MIME type specified as COLUMN_MIME_TYPE.
      */
     internal fun isVirtual(): Boolean {
-        if (!isDocumentUri(context, fileCompat.uri)) return false
+        if (!DocumentsContract.isDocumentUri(context, fileUri)) return false
 
         return fileCompat.documentFlags and flagVirtualDocument != 0
     }
@@ -85,7 +85,7 @@ internal class DocumentController(
      */
     internal fun canRead(): Boolean {
         if (context.checkCallingOrSelfUriPermission(
-                fileCompat.uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION
             ) != PackageManager.PERMISSION_GRANTED
         ) return false
 
@@ -99,7 +99,7 @@ internal class DocumentController(
      */
     internal fun canWrite(): Boolean {
         if (context.checkCallingOrSelfUriPermission(
-                fileCompat.uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                fileUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             ) != PackageManager.PERMISSION_GRANTED
         ) return false
 
@@ -111,6 +111,7 @@ internal class DocumentController(
         if (MIME_TYPE_DIR == fileCompat.documentMimeType &&
             fileCompat.documentFlags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE != 0
         ) return true
+
         else if (fileCompat.documentMimeType.isNotEmpty() &&
             fileCompat.documentFlags and DocumentsContract.Document.FLAG_SUPPORTS_WRITE != 0
         ) return true
@@ -127,7 +128,7 @@ internal class DocumentController(
      * @return A Uri if file was created successfully, **null** otherwise.
      */
     internal fun createFile(mimeType: String, name: String): Uri? {
-        return resolverCompat.createFile(mimeType, name)
+        return ResolverCompat.createFile(context, fileUri, mimeType, name)
     }
 
     /**
@@ -135,14 +136,14 @@ internal class DocumentController(
      *
      * Returns True if the rename was successful, False otherwise.
      */
-    internal fun renameTo(name: String): Boolean {
-        return resolverCompat.renameTo(name)
+    internal fun renameTo(name: String): Uri? {
+        return ResolverCompat.renameTo(context, fileUri, name)
     }
 
     /**
      * Delete a document.
      */
     internal fun delete(): Boolean {
-        return resolverCompat.deleteDocument()
+        return ResolverCompat.deleteDocument(context, fileUri)
     }
 }
