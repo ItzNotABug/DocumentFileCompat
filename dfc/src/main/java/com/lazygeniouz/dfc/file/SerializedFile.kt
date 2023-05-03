@@ -28,7 +28,7 @@ class SerializedFile private constructor(
         internal fun from(file: DocumentFileCompat): SerializedFile {
             with(file) {
                 return SerializedFile(
-                    path, name, length,
+                    uri.toString(), name, length,
                     lastModified, documentMimeType, documentFlags
                 )
             }
