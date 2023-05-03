@@ -1,10 +1,11 @@
 package com.lazygeniouz.dfc.file.internals
 
 import android.content.Context
-import android.database.Cursor
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.resolver.ResolverCompat
 
 /**
  * TreeFileCompat serves as an alternative to the **TreeDocumentFile**
@@ -17,7 +18,7 @@ import com.lazygeniouz.dfc.file.DocumentFileCompat
  * Other params same as [DocumentFileCompat].
  */
 internal class TreeDocumentFileCompat constructor(
-    context: Context, documentUri: String, documentName: String = "", documentSize: Long = 0,
+    context: Context, documentUri: Uri, documentName: String = "", documentSize: Long = 0,
     lastModifiedTime: Long = -1L, documentMimeType: String = "", documentFlags: Int = -1,
 ) : DocumentFileCompat(
     context, documentUri, documentName, documentSize,
@@ -34,7 +35,7 @@ internal class TreeDocumentFileCompat constructor(
      */
     override fun createFile(mimeType: String, name: String): DocumentFileCompat? {
         val treeFileUri = fileController.createFile(mimeType, name)
-        return treeFileUri?.let { fromTreeUri(context, treeFileUri) }
+        return treeFileUri?.let { make(context, treeFileUri, false) }
     }
 
     /**
@@ -46,7 +47,7 @@ internal class TreeDocumentFileCompat constructor(
      */
     override fun createDirectory(name: String): DocumentFileCompat? {
         val treeFileUri = fileController.createFile(MIME_TYPE_DIR, name)
-        return treeFileUri?.let { fromTreeUri(context, treeFileUri) }
+        return treeFileUri?.let { make(context, treeFileUri, false) }
     }
 
     /**
@@ -74,6 +75,17 @@ internal class TreeDocumentFileCompat constructor(
     }
 
     /**
+     * A [TreeDocumentFileCompat] has a wider range of permissions & hence supports rename.
+     *
+     * @return True if the rename was successful, False otherwise.
+     */
+    override fun renameTo(name: String): Boolean {
+        val newUri = fileController.renameTo(name)
+        if (newUri != null) uri = newUri
+        return newUri != null
+    }
+
+    /**
      * Copy would work only if the underlying Uri is a SingleDocumentFile or a File.
      */
     override fun copyTo(destination: Uri) {
@@ -90,25 +102,44 @@ internal class TreeDocumentFileCompat constructor(
     internal companion object {
 
         /**
-         * Extracted in to a separate companion method to not clutter common code while running the
-         * **ContentResolver Queries**.
+         * Return whether the given [uri] is a tree uri.
          */
-        internal fun make(
-            context: Context,
-            cursor: Cursor, documentUri: Uri,
-        ): TreeDocumentFileCompat {
-            // cursor.getString(0) is the documentId
-            val documentName: String = cursor.getString(1)
-            val documentSize: Long = cursor.getLong(2)
-            val documentLastModified: Long = cursor.getLong(3)
-            val documentMimeType: String = cursor.getString(4)
-            val documentFlags: Int = cursor.getLong(5).toInt()
+        private fun isTreeUri(uri: Uri): Boolean {
+            val paths = uri.pathSegments
+            return paths.size >= 2 && "tree" == paths[0]
+        }
 
-            return TreeDocumentFileCompat(
-                context, documentUri.toString(),
-                documentName, documentSize,
-                documentLastModified, documentMimeType, documentFlags
-            )
+        /**
+         * Build the initial [TreeDocumentFileCompat] from a given [uri].
+         */
+        internal fun make(context: Context, uri: Uri, isInitial: Boolean): TreeDocumentFileCompat? {
+            if (!isTreeUri(uri)) {
+                throw UnsupportedOperationException("Document Uri is not a Tree uri.")
+            }
+
+            // build a new tree uri if this is a first tree doc creation...
+            val treeUri = if (isInitial) DocumentsContract.buildDocumentUriUsingTree(
+                uri, DocumentsContract.getTreeDocumentId(uri)
+            ) else uri
+
+            ResolverCompat.getCursor(context, treeUri, ResolverCompat.fullProjection)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val documentName: String = cursor.getString(1)
+                        val documentSize: Long = cursor.getLong(2)
+                        val documentLastModified: Long = cursor.getLong(3)
+                        val documentMimeType: String = cursor.getString(4)
+                        val documentFlags: Int = cursor.getLong(5).toInt()
+
+                        return TreeDocumentFileCompat(
+                            context, treeUri,
+                            documentName, documentSize,
+                            documentLastModified, documentMimeType, documentFlags
+                        )
+                    }
+                }
+
+            return null
         }
     }
 }

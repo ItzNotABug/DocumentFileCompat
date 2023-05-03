@@ -8,7 +8,8 @@ import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
 import android.provider.DocumentsContract.isDocumentUri
 import com.lazygeniouz.dfc.controller.DocumentController
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
-import com.lazygeniouz.dfc.resolver.ResolverCompat
+import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
+import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import java.io.File
 
 /**
@@ -198,7 +199,7 @@ abstract class DocumentFileCompat constructor(
          */
         @JvmStatic
         fun fromTreeUri(context: Context, uri: Uri): DocumentFileCompat? {
-            return ResolverCompat(context, uri).getInitialFileCompat(true)
+            return TreeDocumentFileCompat.make(context, uri, true)
         }
 
         /**
@@ -209,7 +210,7 @@ abstract class DocumentFileCompat constructor(
          */
         @JvmStatic
         fun fromSingleUri(context: Context, uri: Uri): DocumentFileCompat? {
-            return ResolverCompat(context, uri).getInitialFileCompat(false)
+            return SingleDocumentFileCompat.make(context, uri)
         }
 
         /**

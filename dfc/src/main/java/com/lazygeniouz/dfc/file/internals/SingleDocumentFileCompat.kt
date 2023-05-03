@@ -1,9 +1,9 @@
 package com.lazygeniouz.dfc.file.internals
 
 import android.content.Context
-import android.database.Cursor
 import android.net.Uri
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.resolver.ResolverCompat
 
 /**
  * SingleFileCompat serves as an alternative to the **SingleDocumentFile**
@@ -15,7 +15,7 @@ import com.lazygeniouz.dfc.file.DocumentFileCompat
  * Other params same as [DocumentFileCompat].
  */
 internal class SingleDocumentFileCompat(
-    context: Context, documentUri: String, documentName: String = "", documentSize: Long = 0,
+    context: Context, documentUri: Uri, documentName: String = "", documentSize: Long = 0,
     lastModifiedTime: Long = -1L, documentMimeType: String = "", documentFlags: Int = -1,
 ) : DocumentFileCompat(
     context, documentUri, documentName, documentSize,
@@ -41,7 +41,7 @@ internal class SingleDocumentFileCompat(
     }
 
     /**
-     * Cannot iterate a File.
+     * Cannot iterate a single document.
      *
      * @throws UnsupportedOperationException
      */
@@ -50,10 +50,12 @@ internal class SingleDocumentFileCompat(
     }
 
     /**
-     * Not a Directory, no children, no count.
+     * No [listFiles], no children, no count.
+     *
+     * @throws UnsupportedOperationException
      */
     override fun count(): Int {
-        return 0
+        throw UnsupportedOperationException()
     }
 
     /**
@@ -62,6 +64,15 @@ internal class SingleDocumentFileCompat(
      * @throws UnsupportedOperationException
      */
     override fun findFile(name: String): DocumentFileCompat? {
+        throw UnsupportedOperationException()
+    }
+
+    /**
+     * [SingleDocumentFileCompat] has limited access and permissions to the [uri].
+     *
+     * @throws UnsupportedOperationException
+     */
+    override fun renameTo(name: String): Boolean {
         throw UnsupportedOperationException()
     }
 
@@ -82,25 +93,27 @@ internal class SingleDocumentFileCompat(
     internal companion object {
 
         /**
-         * Extracted in to a separate companion method to not clutter common code while running the
-         * **ContentResolver Queries**.
+         * Build a [SingleDocumentFileCompat] from a given [uri].
          */
-        internal fun make(
-            context: Context,
-            cursor: Cursor, documentUri: Uri,
-        ): SingleDocumentFileCompat {
-            // cursor.getString(0) is the documentId
-            val documentName: String = cursor.getString(1)
-            val documentSize: Long = cursor.getLong(2)
-            val documentLastModified: Long = cursor.getLong(3)
-            val documentMimeType: String = cursor.getString(4)
-            val documentFlags: Int = cursor.getLong(5).toInt()
+        internal fun make(context: Context, self: Uri): SingleDocumentFileCompat? {
+            ResolverCompat.getCursor(context, self, ResolverCompat.fullProjection)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val documentName: String = cursor.getString(1)
+                        val documentSize: Long = cursor.getLong(2)
+                        val documentLastModified: Long = cursor.getLong(3)
+                        val documentMimeType: String = cursor.getString(4)
+                        val documentFlags: Int = cursor.getLong(5).toInt()
 
-            return SingleDocumentFileCompat(
-                context, documentUri.toString(),
-                documentName, documentSize,
-                documentLastModified, documentMimeType, documentFlags
-            )
+                        return SingleDocumentFileCompat(
+                            context, self,
+                            documentName, documentSize,
+                            documentLastModified, documentMimeType, documentFlags
+                        )
+                    }
+                }
+
+            return null
         }
     }
 }
