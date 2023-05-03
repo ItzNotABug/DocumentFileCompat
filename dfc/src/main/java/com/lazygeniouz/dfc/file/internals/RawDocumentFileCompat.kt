@@ -14,15 +14,6 @@ import java.io.File
 internal class RawDocumentFileCompat constructor(context: Context, var file: File) :
     DocumentFileCompat(context, file) {
 
-    /**
-     * Returns a [Uri] via [Uri.fromFile] but
-     * if you want to use the **FileProvider** api to get a Uri,
-     * you should convert this Uri to a File, make your checks if necessary &
-     * then use **FileProvider.getUriForFile**.
-     */
-    override val uri: Uri
-        get() = Uri.fromFile(file)
-
     // Get file extension.
     override val extension: String
         get() = file.extension
@@ -33,12 +24,9 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
 
     /**
      * Delete the file & return the result.
-     *
-     * Note it will delete the everything **recursively** if this is a folder
-     * because this uses Kotlin extension [File.deleteRecursively].
      */
     override fun delete(): Boolean {
-        return file.deleteRecursively()
+        return file.delete()
     }
 
     // Check if the file exists.
