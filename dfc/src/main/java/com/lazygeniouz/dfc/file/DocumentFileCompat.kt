@@ -3,6 +3,8 @@ package com.lazygeniouz.dfc.file
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE
+import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
 import android.provider.DocumentsContract.isDocumentUri
 import com.lazygeniouz.dfc.controller.DocumentController
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
@@ -17,8 +19,7 @@ import java.io.File
  */
 abstract class DocumentFileCompat constructor(
     internal val context: Context,
-    internal val path: String,
-    val name: String = "",
+    uri: Uri, val name: String = "",
     open val length: Long = 0,
     val lastModified: Long = -1L,
     internal val documentFlags: Int = -1,
@@ -27,7 +28,7 @@ abstract class DocumentFileCompat constructor(
 
     // Secondary constructor for java.io.File type
     constructor(context: Context, file: File) : this(
-        context, file.absolutePath, file.name, file.length(),
+        context, Uri.fromFile(file), file.name, file.length(),
         file.lastModified(), -1, RawDocumentFileCompat.getMimeType(file)
     )
 
@@ -70,7 +71,7 @@ abstract class DocumentFileCompat constructor(
      *
      * Returns **0** if the uri is not a directory or if the object at uri is null.
      *
-     * **Note: You should use [listFiles] if you are gonna need them later.**
+     * **Note: You should use [listFiles] if you are going to need the elements later.**
      */
     abstract fun count(): Int
 
@@ -95,8 +96,18 @@ abstract class DocumentFileCompat constructor(
      */
     abstract fun copyFrom(source: Uri)
 
-    open val uri: Uri
-        get() = Uri.parse(path)
+    /**
+     * Rename a Document File / Folder.
+     *
+     * Will throw [UnsupportedOperationException] when called on a [SingleDocumentFileCompat].
+     *
+     * @return True if the rename was successful, False otherwise.
+     * @throws UnsupportedOperationException
+     */
+    abstract fun renameTo(name: String): Boolean
+
+    var uri: Uri = uri
+        internal set
 
     /**
      * Get the extension of the Document **File**.
@@ -104,6 +115,16 @@ abstract class DocumentFileCompat constructor(
     open val extension: String
         // taken from Kotlin extension
         get() = name.substringAfterLast('.', "")
+
+    /**
+     * Return the MIME type of this document.
+     *
+     * @return A concrete mime type from [COLUMN_MIME_TYPE] column.
+     */
+    @Suppress("unused")
+    fun getType(): String? {
+        return if (documentMimeType == MIME_TYPE_DIR) null else documentMimeType
+    }
 
     /**
      * Delete the file.
@@ -160,18 +181,9 @@ abstract class DocumentFileCompat constructor(
     }
 
     /**
-     * Rename a Document File / Folder.
-     *
-     * Returns True if the rename was successful, False otherwise.
-     */
-    open fun renameTo(name: String): Boolean {
-        return fileController.renameTo(name)
-    }
-
-    /**
      * Converts a non serializable [DocumentFileCompat] to a serializable [SerializedFile].
      */
-    @Suppress("unused")
+    @Suppress("MemberVisibilityCanBePrivate")
     fun serialize(): SerializedFile {
         return SerializedFile.from(this)
     }
