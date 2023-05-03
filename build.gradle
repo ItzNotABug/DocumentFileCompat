@@ -11,7 +11,7 @@ buildscript {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.0"
 
         classpath 'org.jetbrains.dokka:dokka-gradle-plugin:1.6.0'
-        classpath 'com.vanniktech:gradle-maven-publish-plugin:0.25.1'
+        classpath 'com.vanniktech:gradle-maven-publish-plugin:0.25.2'
     }
 }
 
@@ -23,12 +23,12 @@ allprojects {
 
     plugins.withId("com.vanniktech.maven.publish.base") {
         group "com.lazygeniouz"
-        version "1.0.4"
+        version "1.0.6"
 
         mavenPublishing {
             signAllPublications()
             pomFromGradleProperties()
-            publishToMavenCentral(SonatypeHost.S01, true)
+            publishToMavenCentral("S01", true)
             configure(new AndroidSingleVariantLibrary("release"))
         }
     }
