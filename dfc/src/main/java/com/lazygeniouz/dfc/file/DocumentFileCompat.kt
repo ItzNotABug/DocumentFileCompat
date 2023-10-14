@@ -111,6 +111,15 @@ abstract class DocumentFileCompat constructor(
         internal set
 
     /**
+     * Return the parent file of this document.
+     *
+     * This will be null if called inside the selected directory.\
+     * Should return the correct parent file for child items inside the selected directory.
+     */
+    var parentFile: DocumentFileCompat? = null
+        internal set
+
+    /**
      * Get the extension of the Document **File**.
      */
     open val extension: String

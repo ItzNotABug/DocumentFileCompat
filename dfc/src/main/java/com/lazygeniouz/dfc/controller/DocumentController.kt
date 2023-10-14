@@ -34,7 +34,7 @@ internal class DocumentController(
     internal fun listFiles(): List<DocumentFileCompat> {
         return if (!isDirectory())
             throw UnsupportedOperationException("Selected document is not a Directory.")
-        else ResolverCompat.listFiles(context, fileUri)
+        else ResolverCompat.listFiles(context, fileCompat)
     }
 
     /**

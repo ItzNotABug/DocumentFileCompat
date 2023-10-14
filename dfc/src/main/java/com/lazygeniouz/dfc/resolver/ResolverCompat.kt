@@ -96,9 +96,9 @@ internal object ResolverCompat {
     /**
      * Queries the ContentResolver & builds a list of [DocumentFileCompat] with all the required fields.
      */
-    internal fun listFiles(context: Context, uri: Uri): List<DocumentFileCompat> {
+    internal fun listFiles(context: Context, file: DocumentFileCompat): List<DocumentFileCompat> {
+        val uri = file.uri
         val childrenUri = createChildrenUri(uri)
-        // empty list
         val listOfDocuments = arrayListOf<DocumentFileCompat>()
 
         getCursor(context, childrenUri, fullProjection)?.use { cursor ->
@@ -116,7 +116,10 @@ internal object ResolverCompat {
                     context, documentUri, documentName,
                     documentSize, documentLastModified,
                     documentMimeType, documentFlags
-                ).also { childFile -> listOfDocuments.add(childFile) }
+                ).also { childFile ->
+                    childFile.parentFile = file
+                    listOfDocuments.add(childFile)
+                }
             }
         }
 
