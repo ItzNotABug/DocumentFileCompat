@@ -89,8 +89,14 @@ internal object ResolverCompat {
      * Returns True if the Document Folder / File exists, False otherwise.
      */
     internal fun exists(context: Context, uri: Uri): Boolean {
-        getCursor(context, uri, idProjection)?.use { cursor -> return (cursor.count > 0) }
-        return false
+        return try {
+            getCursor(context, uri, idProjection)?.use { cursor ->
+                cursor.count > 0
+            } ?: false
+        } catch (exception: Exception) {
+            ErrorLogger.logError("Exception while checking if the uri exists", exception)
+            false
+        }
     }
 
     /**
