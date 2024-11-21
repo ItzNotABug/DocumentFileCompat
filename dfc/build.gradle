@@ -6,12 +6,12 @@ plugins {
 }
 
 android {
-    compileSdk 33
+    compileSdk 35
     namespace 'com.lazygeniouz.dfc'
 
     defaultConfig {
         minSdk 21
-        targetSdk 33
+        targetSdk 35
     }
 
     buildTypes {
