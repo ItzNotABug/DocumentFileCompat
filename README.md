@@ -46,11 +46,12 @@ dependencies {
 #### Maven
 
 ```xml
+
 <dependency>
-  <groupId>com.lazygeniouz</groupId>
-  <artifactId>dfc</artifactId>
-  <version>$latest_version</version>
-  <type>aar</type>
+    <groupId>com.lazygeniouz</groupId>
+    <artifactId>dfc</artifactId>
+    <version>$latest_version</version>
+    <type>aar</type>
 </dependency>
 ```
 
