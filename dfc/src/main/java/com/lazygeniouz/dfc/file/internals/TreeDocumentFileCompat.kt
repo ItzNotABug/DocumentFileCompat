@@ -70,8 +70,10 @@ internal class TreeDocumentFileCompat constructor(
     /**
      * Return a file if exists, else **null**.
      */
-    override fun findFile(name: String): DocumentFileCompat? {
-        return listFiles().firstOrNull { file -> file.name.isNotEmpty() && file.name == name }
+    override fun findFile(name: String, ignoreCase: Boolean): DocumentFileCompat? {
+        return listFiles().firstOrNull { file ->
+            file.name.equals(name, ignoreCase = ignoreCase)
+        }
     }
 
     /**
