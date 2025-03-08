@@ -112,7 +112,7 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
     }
 
     // Return a file if exists, else **null**
-    override fun findFile(name: String): DocumentFileCompat? {
+    override fun findFile(name: String, ignoreCase: Boolean): DocumentFileCompat? {
         return listFiles().firstOrNull { file -> file.name.isNotEmpty() && file.name == name }
     }
 

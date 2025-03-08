@@ -79,13 +79,12 @@ abstract class DocumentFileCompat constructor(
     /**
      * Find a File against the given name.
      *
-     *
      * Do not use this if you are going to call `listFiles()` again on the same
-     * DocumentFileCompat object because this method internally searches same list.
+     * [DocumentFileCompat] object because this method internally searches same list.
      *
      * Multiple calls to `listFiles()` can have a performance hit.
      */
-    abstract fun findFile(name: String): DocumentFileCompat?
+    abstract fun findFile(name: String, ignoreCase: Boolean = false): DocumentFileCompat?
 
     /**
      * Copy a document to a given Uri.

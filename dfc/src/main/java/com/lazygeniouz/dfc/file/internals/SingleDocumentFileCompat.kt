@@ -63,7 +63,7 @@ internal class SingleDocumentFileCompat(
      *
      * @throws UnsupportedOperationException
      */
-    override fun findFile(name: String): DocumentFileCompat? {
+    override fun findFile(name: String, ignoreCase: Boolean): DocumentFileCompat? {
         throw UnsupportedOperationException()
     }
 
