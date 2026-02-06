@@ -10,6 +10,7 @@ import android.os.storage.StorageManager
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
@@ -83,6 +84,8 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
         textView = findViewById(R.id.fileNames)
         progress = findViewById(R.id.progress)
 
+        onBackPressedDispatcher.addCallback(this) { finishAffinity() }
+
         buttonDir.setOnClickListener {
             folderResultLauncher.launch(getStorageIntent())
         }
@@ -100,8 +103,4 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
             } else Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
         }
     }
-
-    @Suppress("override_deprecation")
-    // this is just a sample app, ignore this.
-    override fun onBackPressed() = finishAffinity()
 }
