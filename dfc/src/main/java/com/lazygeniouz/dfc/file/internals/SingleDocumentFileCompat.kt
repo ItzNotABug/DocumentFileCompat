@@ -2,6 +2,7 @@ package com.lazygeniouz.dfc.file.internals
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 
@@ -96,6 +97,9 @@ internal class SingleDocumentFileCompat(
          * Build a [SingleDocumentFileCompat] from a given [uri].
          */
         internal fun make(context: Context, self: Uri): SingleDocumentFileCompat? {
+            if (isTreeUri(self)) return null
+            if (!DocumentsContract.isDocumentUri(context, self)) return null
+
             ResolverCompat.getCursor(context, self, ResolverCompat.fullProjection)
                 ?.use { cursor ->
                     if (cursor.moveToFirst()) {
