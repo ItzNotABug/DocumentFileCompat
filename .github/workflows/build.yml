@@ -11,7 +11,7 @@ on:
       - "dfc/**"
 
 jobs:
-  compile:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
