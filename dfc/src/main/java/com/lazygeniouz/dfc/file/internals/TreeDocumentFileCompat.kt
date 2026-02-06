@@ -104,14 +104,6 @@ internal class TreeDocumentFileCompat constructor(
     internal companion object {
 
         /**
-         * Return whether the given [uri] is a tree uri.
-         */
-        private fun isTreeUri(uri: Uri): Boolean {
-            val paths = uri.pathSegments
-            return paths.size >= 2 && "tree" == paths[0]
-        }
-
-        /**
          * Build the initial [TreeDocumentFileCompat] from a given [uri].
          */
         internal fun make(context: Context, uri: Uri, isInitial: Boolean): TreeDocumentFileCompat? {
@@ -120,9 +112,12 @@ internal class TreeDocumentFileCompat constructor(
             }
 
             // build a new tree uri if this is a first tree doc creation...
-            val treeUri = if (isInitial) DocumentsContract.buildDocumentUriUsingTree(
-                uri, DocumentsContract.getTreeDocumentId(uri)
-            ) else uri
+            // but only if the uri is not already a document uri to preserve subdir info.
+            val treeUri = if (isInitial && !DocumentsContract.isDocumentUri(context, uri)) {
+                DocumentsContract.buildDocumentUriUsingTree(
+                    uri, DocumentsContract.getTreeDocumentId(uri)
+                )
+            } else uri
 
             ResolverCompat.getCursor(context, treeUri, ResolverCompat.fullProjection)
                 ?.use { cursor ->

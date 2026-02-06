@@ -240,5 +240,13 @@ abstract class DocumentFileCompat constructor(
         fun isDocument(context: Context, uri: Uri): Boolean {
             return isDocumentUri(context, uri)
         }
+
+        /**
+         * Return whether the given [uri] is a tree uri.
+         */
+        internal fun isTreeUri(uri: Uri): Boolean {
+            val paths = uri.pathSegments
+            return paths.size >= 2 && "tree" == paths[0]
+        }
     }
 }
