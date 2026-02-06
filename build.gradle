@@ -31,7 +31,7 @@ allprojects {
             pomFromGradleProperties()
             publishToMavenCentral(true)
             configure(new AndroidSingleVariantLibrary(
-                    new JavadocJar.Dokka("dokkaHtml"),
+                    new JavadocJar.Dokka("dokkaGenerateHtml"),
                     new SourcesJar.Sources(),
                     "release"
             ))
