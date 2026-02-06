@@ -1,44 +1,45 @@
 plugins {
-    id 'com.android.application'
-    id 'kotlin-android'
+    id "com.android.application"
 }
 
 android {
-    compileSdk 33
-    namespace 'com.lazygeniouz.filecompat.example'
+    compileSdk = 36
+    namespace = "com.lazygeniouz.filecompat.example"
 
     defaultConfig {
-        applicationId "com.lazygeniouz.filecompat.example"
-        minSdk 21
-        targetSdk 33
-        versionCode 1
-        versionName "1.0"
+        applicationId = "com.lazygeniouz.filecompat.example"
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        minSdk = 23
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            minifyEnabled = false
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+    buildFeatures {
+        buildConfig = true
     }
 
-    kotlinOptions {
-        jvmTarget = '1.8'
-        freeCompilerArgs += "-Xopt-in=kotlin.RequiresOptIn"
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
 dependencies {
-    implementation project(':dfc')
+    implementation project(":dfc")
+    //implementation "com.lazygeniouz:dfc:1.1"
 
-    implementation 'androidx.appcompat:appcompat:1.6.0'
-    implementation 'androidx.activity:activity-ktx:1.6.1'
-    implementation 'com.google.android.material:material:1.7.0'
+    implementation "androidx.appcompat:appcompat:1.7.1"
+    implementation "androidx.activity:activity-ktx:1.12.3"
+    implementation "androidx.documentfile:documentfile:1.1.0"
+    implementation "com.google.android.material:material:1.13.0"
 }
