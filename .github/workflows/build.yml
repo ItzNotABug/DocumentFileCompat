@@ -1,0 +1,28 @@
+name: Build source
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    paths:
+      - "dfc/**"
+  push:
+    branches: [ master ]
+    paths:
+      - "dfc/**"
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Build DFC
+        run: ./gradlew :dfc:assemble
