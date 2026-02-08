@@ -3,6 +3,7 @@ package com.lazygeniouz.filecompat.example.performance
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract.Document
+import androidx.documentfile.provider.DocumentFile
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.filecompat.example.performance.Performance.measureTimeSeconds
 
@@ -22,6 +23,11 @@ object ProjectionPerformance {
 
         // Test 3: ID + Name + Size
         results += testPartialProjection(context, uri) + "\n\n"
+
+        results += "=".repeat(48).plus("\n\n")
+
+        // Test 4: count() vs listFiles().size
+        results += testCountVsListSize(context, uri) + "\n\n"
 
         results += "=".repeat(48).plus("\n\n")
 
@@ -90,5 +96,27 @@ object ProjectionPerformance {
                     "Total Size: $sizeMb\n" +
                     "Time: ${time}s"
         }
+    }
+
+    private fun testCountVsListSize(context: Context, uri: Uri): String {
+        val documentFile = DocumentFileCompat.fromTreeUri(context, uri)
+            ?: return "Failed to access directory"
+
+        val dfListSizeTime = measureTimeSeconds {
+            DocumentFile.fromTreeUri(context, uri)?.listFiles()?.size
+        }
+
+        val dfcCountTime = measureTimeSeconds {
+            documentFile.count()
+        }
+
+        val dfcListSizeTime = measureTimeSeconds {
+            documentFile.listFiles().size
+        }
+
+        return "count() vs listFiles().size:\n\n" +
+                "DocumentFile.listFiles().size = ${dfListSizeTime}s\n" +
+                "DFC.count() = ${dfcCountTime}s\n" +
+                "DFC.listFiles().size = ${dfcListSizeTime}s"
     }
 }
