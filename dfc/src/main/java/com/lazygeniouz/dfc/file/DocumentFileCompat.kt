@@ -60,16 +60,11 @@ abstract class DocumentFileCompat(
     abstract fun createDirectory(name: String): DocumentFileCompat?
 
     /**
-     * This will return a list of [DocumentFileCompat] with all the defined fields
-     * only when the current document is a **Directory**.
+     * Same as [listFiles] but allows specifying a custom [projection] (columns to query).
      *
-     * @param projection Columns to query. Use custom projection to improve performance by fetching only needed data.
-     *
-     * A [UnsupportedOperationException] is thrown if the uri is not a directory.
+     * Use custom projection to improve performance by fetching only needed data.
      */
-    abstract fun listFiles(
-        projection: Array<String> = ResolverCompat.fullProjection,
-    ): List<DocumentFileCompat>
+    abstract fun listFiles(projection: Array<String>): List<DocumentFileCompat>
 
     /**
      * This will return the children count inside a **Directory** without creating [DocumentFileCompat] objects.
@@ -191,6 +186,16 @@ abstract class DocumentFileCompat(
      */
     open fun isDirectory(): Boolean {
         return fileController.isDirectory()
+    }
+
+    /**
+     * This will return a list of [DocumentFileCompat] with all the defined fields
+     * only when the current document is a **Directory**.
+     *
+     * A [UnsupportedOperationException] is thrown if the uri is not a directory.
+     */
+    open fun listFiles(): List<DocumentFileCompat> {
+        return listFiles(ResolverCompat.fullProjection)
     }
 
     /**
