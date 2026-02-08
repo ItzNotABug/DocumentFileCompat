@@ -51,6 +51,15 @@ internal class SingleDocumentFileCompat(
     }
 
     /**
+     * Single document Uris don't have children, so projections are not applicable.
+     *
+     * @throws UnsupportedOperationException
+     */
+    override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
+        return listFiles()
+    }
+
+    /**
      * No [listFiles], no children, no count.
      *
      * @throws UnsupportedOperationException

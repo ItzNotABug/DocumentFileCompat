@@ -17,7 +17,7 @@ import com.lazygeniouz.dfc.resolver.ResolverCompat
  *
  * Other params same as [DocumentFileCompat].
  */
-internal class TreeDocumentFileCompat constructor(
+internal class TreeDocumentFileCompat(
     context: Context, documentUri: Uri, documentName: String = "", documentSize: Long = 0,
     lastModifiedTime: Long = -1L, documentMimeType: String = "", documentFlags: Int = -1,
 ) : DocumentFileCompat(
@@ -51,8 +51,12 @@ internal class TreeDocumentFileCompat constructor(
     }
 
     /**
-     * This will return a list of [DocumentFileCompat] with all the defined fields.
+     * This will return a list of [DocumentFileCompat] with the required fields based on the passed [projection].
      */
+    override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
+        return fileController.listFiles(projection)
+    }
+
     override fun listFiles(): List<DocumentFileCompat> {
         return fileController.listFiles()
     }

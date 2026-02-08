@@ -24,7 +24,10 @@ object DirectoryPerformance {
         results += "Fetching only Uris will always be faster (after File)" + "\nBut try fetching the Documents' Names.\n\n"
         results += calculateDocumentFileCompatPerformanceWithName(context, uri) + "\n"
         results += calculateDocumentFilePerformanceOnlyUri(context, uri) + "\n"
-        results += calculateDocumentFilePerformanceWithName(context, uri)
+        results += calculateDocumentFilePerformanceWithName(context, uri) + "\n\n"
+
+        results += "=".repeat(48).plus("\n\n")
+        results += calculateCountVsListSize(context, uri)
         return results
     }
 
@@ -140,5 +143,26 @@ object DirectoryPerformance {
         }.also { time ->
             return ("DFC Performance (With Names) = ${time}s")
         }
+    }
+
+    private fun calculateCountVsListSize(context: Context, uri: Uri): String {
+        val documentFile = DocumentFileCompat.fromTreeUri(context, uri)
+            ?: return "Failed to access directory"
+
+        val dfListSizeTime = measureTimeSeconds {
+            DocumentFile.fromTreeUri(context, uri)?.listFiles()?.size
+        }
+
+        val dfcCountTime = measureTimeSeconds {
+            documentFile.count()
+        }
+
+        val dfcListSizeTime = measureTimeSeconds {
+            documentFile.listFiles().size
+        }
+
+        return "DocumentFile.listFiles().size = ${dfListSizeTime}s\n" +
+                "DFC count() Performance = ${dfcCountTime}s\n" +
+                "DFC listFiles().size Performance = ${dfcListSizeTime}s"
     }
 }

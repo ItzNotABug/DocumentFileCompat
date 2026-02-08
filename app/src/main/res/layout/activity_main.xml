@@ -35,4 +35,12 @@
         android:paddingVertical="12dp"
         android:text="@string/select_a_file" />
 
+    <Button
+        android:id="@+id/buttonProjections"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginVertical="12dp"
+        android:paddingVertical="12dp"
+        android:text="@string/test_custom_projections" />
+
 </LinearLayout>

@@ -16,6 +16,10 @@ object Performance {
         return FilesPerformance.calculateFileSidePerformance(context, uri)
     }
 
+    fun calculateProjectionPerformance(context: Context, uri: Uri): String {
+        return ProjectionPerformance.calculateProjectionPerformance(context, uri)
+    }
+
     fun getUsablePath(uri: Uri): String {
         val path = uri.path!!
         return when {
