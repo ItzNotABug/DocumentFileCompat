@@ -9,7 +9,6 @@ import com.lazygeniouz.dfc.controller.DocumentController
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
-import com.lazygeniouz.dfc.resolver.ResolverCompat
 import java.io.File
 
 /**
@@ -58,6 +57,14 @@ abstract class DocumentFileCompat(
      * @return A DocumentFileCompat object if directory was created successfully, **null** otherwise.
      */
     abstract fun createDirectory(name: String): DocumentFileCompat?
+
+    /**
+     * This will return a list of [DocumentFileCompat] with all the defined fields
+     * only when the current document is a **Directory**.
+     *
+     * A [UnsupportedOperationException] is thrown if the uri is not a directory.
+     */
+    abstract fun listFiles(): List<DocumentFileCompat>
 
     /**
      * Same as [listFiles] but allows specifying a custom [projection] (columns to query).
@@ -186,16 +193,6 @@ abstract class DocumentFileCompat(
      */
     open fun isDirectory(): Boolean {
         return fileController.isDirectory()
-    }
-
-    /**
-     * This will return a list of [DocumentFileCompat] with all the defined fields
-     * only when the current document is a **Directory**.
-     *
-     * A [UnsupportedOperationException] is thrown if the uri is not a directory.
-     */
-    open fun listFiles(): List<DocumentFileCompat> {
-        return listFiles(ResolverCompat.fullProjection)
     }
 
     /**

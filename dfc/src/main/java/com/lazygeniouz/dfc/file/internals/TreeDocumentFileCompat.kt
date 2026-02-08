@@ -57,6 +57,10 @@ internal class TreeDocumentFileCompat(
         return fileController.listFiles(projection)
     }
 
+    override fun listFiles(): List<DocumentFileCompat> {
+        return fileController.listFiles()
+    }
+
     /**
      * This will return the children count in the directory.
      *

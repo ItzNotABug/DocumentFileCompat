@@ -98,13 +98,18 @@ internal class RawDocumentFileCompat(context: Context, var file: File) :
 
     /**
      * Returns list of files using File API.
+     */
+    override fun listFiles(): List<DocumentFileCompat> {
+        return file.listFiles()?.map { child -> fromFile(context, child) } ?: emptyList()
+    }
+
+    /**
+     * Returns list of files using File API.
      *
-     * The performance of File api is pretty great as compared to others.
-     *
-     * Note: [projection] parameter is ignored as File API doesn't support custom projections.
+     * Note: [projection] is ignored as the File API doesn't support it.
      */
     override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
-        return file.listFiles()?.map { child -> fromFile(context, child) } ?: emptyList()
+        return listFiles()
     }
 
     /**
