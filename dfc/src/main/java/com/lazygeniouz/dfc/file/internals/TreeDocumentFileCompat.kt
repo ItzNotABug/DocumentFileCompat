@@ -51,7 +51,7 @@ internal class TreeDocumentFileCompat(
     }
 
     /**
-     * This will return a list of [DocumentFileCompat] with all or the required defined fields as per passed [projection].
+     * This will return a list of [DocumentFileCompat] with the required fields based on the passed [projection].
      */
     override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
         return fileController.listFiles(projection)
