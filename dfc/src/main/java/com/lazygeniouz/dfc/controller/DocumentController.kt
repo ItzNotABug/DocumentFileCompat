@@ -64,6 +64,7 @@ internal class DocumentController(
      */
     internal fun isVirtual(): Boolean {
         if (!DocumentsContract.isDocumentUri(context, fileUri)) return false
+        if (fileCompat.documentFlags == -1) return false
 
         return fileCompat.documentFlags and flagVirtualDocument != 0
     }
@@ -106,6 +107,7 @@ internal class DocumentController(
         ) return false
 
         if (fileCompat.documentMimeType.isEmpty()) return false
+        if (fileCompat.documentFlags == -1) return false
 
         if (fileCompat.documentFlags and Document.FLAG_SUPPORTS_DELETE != 0)
             return true

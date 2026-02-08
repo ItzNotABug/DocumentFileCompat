@@ -159,7 +159,12 @@ internal object ResolverCompat {
                 val documentSize = getLongOrDefault(cursor, sizeIndex)
                 val lastModifiedTime = getLongOrDefault(cursor, modifiedIndex, -1L)
                 val documentMimeType = getStringOrDefault(cursor, mimeIndex)
-                val documentFlags = getLongOrDefault(cursor, flagsIndex, -1L).toInt()
+
+                /**
+                 * Default flags to 0 (no capabilities) when not included.
+                 * Using `-1` here would make bitwise checks behave as "all flags set".
+                 */
+                val documentFlags = getLongOrDefault(cursor, flagsIndex, 0L).toInt()
 
                 TreeDocumentFileCompat(
                     context, documentUri, documentName,
