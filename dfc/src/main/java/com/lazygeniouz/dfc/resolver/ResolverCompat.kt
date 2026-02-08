@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.provider.DocumentsContract.Document
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import com.lazygeniouz.dfc.logger.ErrorLogger
@@ -14,16 +15,24 @@ import com.lazygeniouz.dfc.logger.ErrorLogger
  */
 internal object ResolverCompat {
 
-    private val iconProjection = arrayOf(DocumentsContract.Document.COLUMN_ICON)
-    private val idProjection = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+    private val iconProjection = arrayOf(Document.COLUMN_ICON)
+    private val idProjection = arrayOf(Document.COLUMN_DOCUMENT_ID)
     val fullProjection = arrayOf(
-        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-        DocumentsContract.Document.COLUMN_SIZE,
-        DocumentsContract.Document.COLUMN_LAST_MODIFIED,
-        DocumentsContract.Document.COLUMN_MIME_TYPE,
-        DocumentsContract.Document.COLUMN_FLAGS
+        Document.COLUMN_DOCUMENT_ID,
+        Document.COLUMN_DISPLAY_NAME,
+        Document.COLUMN_SIZE,
+        Document.COLUMN_LAST_MODIFIED,
+        Document.COLUMN_MIME_TYPE,
+        Document.COLUMN_FLAGS
     )
+
+    private fun getStringOrDefault(cursor: Cursor, index: Int, default: String = ""): String {
+        return if (index != -1) cursor.getString(index) else default
+    }
+
+    private fun getLongOrDefault(cursor: Cursor, index: Int, default: Long = 0L): Long {
+        return if (index != -1) cursor.getLong(index) else default
+    }
 
     /**
      * Delete the file.
@@ -46,7 +55,7 @@ internal object ResolverCompat {
      */
     internal fun renameTo(context: Context, uri: Uri, name: String): Uri? {
         return try {
-            return DocumentsContract.renameDocument(context.contentResolver, uri, name)
+            DocumentsContract.renameDocument(context.contentResolver, uri, name)
         } catch (exception: Exception) {
             ErrorLogger.logError("Exception while renaming document", exception)
             null
@@ -105,12 +114,23 @@ internal object ResolverCompat {
     /**
      * Queries the ContentResolver & builds a list of [DocumentFileCompat] with all the required fields.
      */
-    internal fun listFiles(context: Context, file: DocumentFileCompat): List<DocumentFileCompat> {
+    internal fun listFiles(
+        context: Context,
+        file: DocumentFileCompat,
+        projection: Array<String> = fullProjection,
+    ): List<DocumentFileCompat> {
         val uri = file.uri
         val childrenUri = createChildrenUri(uri)
         val listOfDocuments = arrayListOf<DocumentFileCompat>()
 
-        getCursor(context, childrenUri, fullProjection)?.use { cursor ->
+        // ensure `Document.COLUMN_DOCUMENT_ID` is always included
+        val finalProjection = if (Document.COLUMN_DOCUMENT_ID !in projection) {
+            arrayOf(Document.COLUMN_DOCUMENT_ID, *projection)
+        } else projection
+
+        val cursor = getCursor(context, childrenUri, finalProjection) ?: return emptyList()
+
+        cursor.use {
             val itemCount = cursor.count
             /**
              * Pre-sizing the list to avoid resizing overhead.
@@ -122,19 +142,28 @@ internal object ResolverCompat {
              */
             if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
 
+            // Resolve column indices dynamically
+            val idIndex = cursor.getColumnIndex(Document.COLUMN_DOCUMENT_ID)
+
+            val nameIndex = cursor.getColumnIndex(Document.COLUMN_DISPLAY_NAME)
+            val sizeIndex = cursor.getColumnIndex(Document.COLUMN_SIZE)
+            val modifiedIndex = cursor.getColumnIndex(Document.COLUMN_LAST_MODIFIED)
+            val mimeIndex = cursor.getColumnIndex(Document.COLUMN_MIME_TYPE)
+            val flagsIndex = cursor.getColumnIndex(Document.COLUMN_FLAGS)
+
             while (cursor.moveToNext()) {
-                val documentId: String = cursor.getString(0)
+                val documentId = cursor.getString(idIndex)
                 val documentUri = DocumentsContract.buildDocumentUriUsingTree(uri, documentId)
 
-                val documentName: String = cursor.getString(1)
-                val documentSize: Long = cursor.getLong(2)
-                val documentLastModified: Long = cursor.getLong(3)
-                val documentMimeType: String = cursor.getString(4)
-                val documentFlags: Int = cursor.getLong(5).toInt()
+                val documentName = getStringOrDefault(cursor, nameIndex)
+                val documentSize = getLongOrDefault(cursor, sizeIndex)
+                val lastModifiedTime = getLongOrDefault(cursor, modifiedIndex, -1L)
+                val documentMimeType = getStringOrDefault(cursor, mimeIndex)
+                val documentFlags = getLongOrDefault(cursor, flagsIndex, -1L).toInt()
 
                 TreeDocumentFileCompat(
                     context, documentUri, documentName,
-                    documentSize, documentLastModified,
+                    documentSize, lastModifiedTime,
                     documentMimeType, documentFlags
                 ).also { childFile ->
                     childFile.parentFile = file
@@ -158,7 +187,7 @@ internal object ResolverCompat {
             /**
              * This exception can occur in scenarios such as -
              *
-             * - The Uri became invalid due to external changes (e.g., permissions revoked, storage unmounted, etc).
+             * - The Uri became invalid due to external changes (e.g., permissions revoked, storage unmounted, etc.).
              * - The file or directory represented by this Uri was probably deleted or became `inaccessible` after the Uri was obtained but before this operation was performed.
              */
             ErrorLogger.logError("Exception while building the Cursor", exception)

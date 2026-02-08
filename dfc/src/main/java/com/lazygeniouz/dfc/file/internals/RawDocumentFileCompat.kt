@@ -11,7 +11,7 @@ import java.io.File
  * RawDocumentFileCompat serves as an alternative to the **RawDocumentFile**
  * which handles Documents using the native [File] api.
  */
-internal class RawDocumentFileCompat constructor(context: Context, var file: File) :
+internal class RawDocumentFileCompat(context: Context, var file: File) :
     DocumentFileCompat(context, file) {
 
     // Get file extension.
@@ -96,8 +96,14 @@ internal class RawDocumentFileCompat constructor(context: Context, var file: Fil
         else null
     }
 
-    // Performance of File api is pretty great as compared to others.
-    override fun listFiles(): List<DocumentFileCompat> {
+    /**
+     * Returns list of files using File API.
+     *
+     * The performance of File api is pretty great as compared to others.
+     *
+     * Note: [projection] parameter is ignored as File API doesn't support custom projections.
+     */
+    override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
         return file.listFiles()?.map { child -> fromFile(context, child) } ?: emptyList()
     }
 

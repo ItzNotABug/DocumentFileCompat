@@ -3,13 +3,13 @@ package com.lazygeniouz.dfc.file
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
-import android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE
-import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
-import android.provider.DocumentsContract.isDocumentUri
+import android.provider.DocumentsContract
+import android.provider.DocumentsContract.Document
 import com.lazygeniouz.dfc.controller.DocumentController
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.resolver.ResolverCompat
 import java.io.File
 
 /**
@@ -18,7 +18,7 @@ import java.io.File
  *
  * Use [DocumentFileCompat.serialize] to get a [Serializable] object.
  */
-abstract class DocumentFileCompat constructor(
+abstract class DocumentFileCompat(
     internal val context: Context,
     uri: Uri, val name: String = "",
     open val length: Long = 0,
@@ -63,9 +63,13 @@ abstract class DocumentFileCompat constructor(
      * This will return a list of [DocumentFileCompat] with all the defined fields
      * only when the current document is a **Directory**.
      *
+     * @param projection Columns to query. Use custom projection to improve performance by fetching only needed data.
+     *
      * A [UnsupportedOperationException] is thrown if the uri is not a directory.
      */
-    abstract fun listFiles(): List<DocumentFileCompat>
+    abstract fun listFiles(
+        projection: Array<String> = ResolverCompat.fullProjection,
+    ): List<DocumentFileCompat>
 
     /**
      * This will return the children count inside a **Directory** without creating [DocumentFileCompat] objects.
@@ -128,11 +132,11 @@ abstract class DocumentFileCompat constructor(
     /**
      * Return the MIME type of this document.
      *
-     * @return A concrete mime type from [COLUMN_MIME_TYPE] column.
+     * @return A concrete mime type from [Document.COLUMN_MIME_TYPE] column.
      */
     @Suppress("unused")
     fun getType(): String? {
-        return if (documentMimeType == MIME_TYPE_DIR) null else documentMimeType
+        return if (documentMimeType == Document.MIME_TYPE_DIR) null else documentMimeType
     }
 
     /**
@@ -237,8 +241,8 @@ abstract class DocumentFileCompat constructor(
          */
         @JvmStatic
         @Suppress("unused")
-        fun isDocument(context: Context, uri: Uri): Boolean {
-            return isDocumentUri(context, uri)
+        fun isDocumentUri(context: Context, uri: Uri): Boolean {
+            return DocumentsContract.isDocumentUri(context, uri)
         }
 
         /**
