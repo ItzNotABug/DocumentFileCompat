@@ -27,11 +27,13 @@ internal object ResolverCompat {
     )
 
     private fun getStringOrDefault(cursor: Cursor, index: Int, default: String = ""): String {
-        return if (index != -1) cursor.getString(index) else default
+        if (index == -1 || cursor.isNull(index)) return default
+        return cursor.getString(index) ?: default
     }
 
     private fun getLongOrDefault(cursor: Cursor, index: Int, default: Long = 0L): Long {
-        return if (index != -1) cursor.getLong(index) else default
+        if (index == -1 || cursor.isNull(index)) return default
+        return cursor.getLong(index)
     }
 
     /**
@@ -143,7 +145,7 @@ internal object ResolverCompat {
             if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
 
             // Resolve column indices dynamically
-            val idIndex = cursor.getColumnIndex(Document.COLUMN_DOCUMENT_ID)
+            val idIndex = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
 
             val nameIndex = cursor.getColumnIndex(Document.COLUMN_DISPLAY_NAME)
             val sizeIndex = cursor.getColumnIndex(Document.COLUMN_SIZE)
@@ -152,7 +154,7 @@ internal object ResolverCompat {
             val flagsIndex = cursor.getColumnIndex(Document.COLUMN_FLAGS)
 
             while (cursor.moveToNext()) {
-                val documentId = cursor.getString(idIndex)
+                val documentId = cursor.getString(idIndex) ?: continue
                 val documentUri = DocumentsContract.buildDocumentUriUsingTree(uri, documentId)
 
                 val documentName = getStringOrDefault(cursor, nameIndex)
