@@ -106,7 +106,6 @@ internal class SingleDocumentFileCompat(
          * Build a [SingleDocumentFileCompat] from a given [uri].
          */
         internal fun make(context: Context, self: Uri): SingleDocumentFileCompat? {
-            if (isTreeUri(self)) return null
             if (!DocumentsContract.isDocumentUri(context, self)) return null
 
             ResolverCompat.getCursor(context, self, ResolverCompat.fullProjection)
