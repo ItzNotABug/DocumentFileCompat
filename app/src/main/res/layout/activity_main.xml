@@ -1,21 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
     android:fitsSystemWindows="true"
-    android:gravity="center"
     android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/fileNames"
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="12dp" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <TextView
+            android:id="@+id/fileNames"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="12dp" />
+    </ScrollView>
 
     <ProgressBar
         android:id="@+id/progress"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
         android:indeterminate="true"
         android:visibility="gone" />
 
@@ -23,6 +30,7 @@
         android:id="@+id/buttonDir"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
         android:layout_marginVertical="12dp"
         android:paddingVertical="12dp"
         android:text="@string/select_directory" />
@@ -31,6 +39,7 @@
         android:id="@+id/buttonFile"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
         android:layout_marginVertical="12dp"
         android:paddingVertical="12dp"
         android:text="@string/select_a_file" />
@@ -39,6 +48,7 @@
         android:id="@+id/buttonProjections"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
         android:layout_marginVertical="12dp"
         android:paddingVertical="12dp"
         android:text="@string/test_custom_projections" />
