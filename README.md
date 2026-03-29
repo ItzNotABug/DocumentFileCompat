@@ -1,21 +1,36 @@
 # DocumentFileCompat
 
-A faster alternative to AndroidX's DocumentFile.
+AndroidX `DocumentFile`, without the usual performance tax.
+
+`DocumentFileCompat` is a faster, practical alternative to AndroidX's `DocumentFile` for working
+with SAF tree and document Uris. It reduces repeated `ContentResolver` lookups by fetching the
+metadata you actually need up front, so directory listing and file inspection stay usable even in
+large folders.
 
 ### The Problem with DocumentFile
 
-It is horribly slow!\
-For **almost** every method, there is a query to **ContentResolver**.
+`DocumentFile` is convenient, but it can get painfully slow.
 
-The most common one is `DocumentFile.findFile()`, `DocumentFile.getName()` and other is building a
-Custom Data Model with multiple parameters.\
-This can take like a horrible amount of time.
+For many common operations, it repeatedly queries `ContentResolver`. That cost adds up fast when
+you:
 
-### Solution
+- list large directories
+- call `findFile()`
+- read names, sizes, MIME types, and timestamps for many children
+- build your own file models from SAF results
 
-`DocumentFileCompat` is a drop-in replacement which gathers relevant parameters when querying for
-files.\
-The performance can sometimes peak to 2x or quite higher, depending on the size of the folder.
+### Why DocumentFileCompat
+
+`DocumentFileCompat` keeps the API familiar, but fetches relevant file metadata in a single pass
+when possible.
+
+That means you get:
+
+- faster directory listing
+- fewer redundant SAF queries
+- custom projections when you only need a few columns
+- query support for filtering, sorting, paging, and projection
+- a drop-in-friendly replacement for most `DocumentFile` usage
 
 Check the screenshots below:
 
@@ -23,15 +38,11 @@ Check the screenshots below:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 [<img src="/screenshots/filecompat_file_perf.jpeg" height="500"/>](/screenshots/filecompat_file_perf.jpeg)
 
-**48 whopping seconds for directory listing compared to 3.5!** (Obviously, No competition with the
-Native File API).\
-Also extracting file information does not take that much time but the improvement is still
-significant.
+One local benchmark dropped a large directory listing from **48 seconds to 3.5 seconds**.\
+It still does not beat the native `File` API, but for SAF-heavy code it is a major improvement.
 
-**Note:** `DocumentFileCompat` is something that I used internally for some projects & therefore I
-didn't do much of file manipulation with it (only delete files) <strike>and therefore this API does
-not offer too much out of the box</strike>.\
-This is now a completely usable alternative to `DocumentFile`.
+What started as an internal utility is now a solid, usable alternative to `DocumentFile` for
+real-world SAF workflows.
 
 ### Installation
 
@@ -57,9 +68,58 @@ dependencies {
 
 ### Usage
 
-Almost all of the methods & getters are identical to `DocumentFile`, you'll just have to replace the
-imports.\
-Additional methods like `copyTo(destination: Uri)` & `copyFrom(source: Uri)` are added as well.
+Most methods and getters are intentionally close to AndroidX `DocumentFile`, so migration is mostly
+about swapping imports.
+
+Extras include:
+
+- `copyTo(destination: Uri)`
+- `copyFrom(source: Uri)`
+- custom projections
+- query-based child listing
+
+Basic example:
+
+```kotlin
+val directory = DocumentFileCompat.fromTreeUri(context, treeUri) ?: return
+
+val recentFiles = directory.listFiles()
+```
+
+#### Querying Child Documents
+
+`DocumentFileCompat` now supports `listFiles(vararg queries: Query)` for tree-backed directories
+when you need filtering, sorting, paging, or projection without dropping down to raw resolver code.
+
+```kotlin
+import android.provider.DocumentsContract
+import com.lazygeniouz.dfc.file.Query
+
+val directory = DocumentFileCompat.fromTreeUri(context, treeUri) ?: return
+
+val files = directory.listFiles(
+    Query.filesOnly(),
+    Query.orderByDesc(DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+    Query.limit(100),
+    Query.select(
+        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        DocumentsContract.Document.COLUMN_SIZE,
+    ),
+)
+```
+
+Notes:
+
+- `listFiles(vararg queries: Query)` is only supported for tree-backed `DocumentsProvider`
+  directories.
+- On API 21-25, only `Query.select(...)`, `Query.projection(...)`, `Query.orderByAsc(...)`, and
+  `Query.orderByDesc(...)` are honored.
+- On API 26+, filter queries, `Query.limit(...)`, `Query.offset(...)`, and
+  `Query.rawSelection(...)` are also forwarded.
+- Unsupported queries are ignored and logged.
+- Providers may still ignore supported query arguments. `DocumentFileCompat` forwards them, but the
+  underlying provider decides what gets honored.
 
 #### Reference:
 
