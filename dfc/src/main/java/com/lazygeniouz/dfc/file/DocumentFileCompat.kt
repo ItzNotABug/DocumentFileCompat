@@ -74,6 +74,20 @@ abstract class DocumentFileCompat(
     abstract fun listFiles(projection: Array<String>): List<DocumentFileCompat>
 
     /**
+     * List child documents using [Query] clauses.
+     *
+     * This is only supported for tree-backed directories.
+     *
+     * API support for SAF child-document queries:
+     *
+     * - API 21-25: only [Query.select], [Query.projection], [Query.orderByAsc], and [Query.orderByDesc] are honored.
+     * - API 26+: filter queries, [Query.limit], [Query.offset], and [Query.rawSelection] are also forwarded.
+     *
+     * **NOTE: Unsupported clauses are ignored and logged.**
+     */
+    abstract fun listFiles(vararg queries: Query): List<DocumentFileCompat>
+
+    /**
      * This will return the children count inside a **Directory** without creating [DocumentFileCompat] objects.
      *
      * Returns **0** if the uri is not a directory or if the object at uri is null.

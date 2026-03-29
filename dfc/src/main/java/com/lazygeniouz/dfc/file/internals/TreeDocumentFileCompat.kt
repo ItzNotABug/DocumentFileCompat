@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 
 /**
@@ -59,6 +60,10 @@ internal class TreeDocumentFileCompat(
 
     override fun listFiles(): List<DocumentFileCompat> {
         return fileController.listFiles()
+    }
+
+    override fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
+        return fileController.listFiles(*queries)
     }
 
     /**

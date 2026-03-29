@@ -8,6 +8,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 
 
@@ -37,6 +38,15 @@ internal class DocumentController(
         return if (!isDirectory())
             throw UnsupportedOperationException("Selected document is not a Directory.")
         else ResolverCompat.listFiles(context, fileCompat, projection)
+    }
+
+    /**
+     * List child documents using provider-specific query arguments.
+     */
+    internal fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
+        return if (!isDirectory()) {
+            throw UnsupportedOperationException("Selected document is not a Directory.")
+        } else ResolverCompat.queryFiles(context, fileCompat, *queries)
     }
 
     /**
@@ -115,7 +125,6 @@ internal class DocumentController(
         if (Document.MIME_TYPE_DIR == fileCompat.documentMimeType &&
             fileCompat.documentFlags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE != 0
         ) return true
-
         else if (fileCompat.documentMimeType.isNotEmpty() &&
             fileCompat.documentFlags and Document.FLAG_SUPPORTS_WRITE != 0
         ) return true
