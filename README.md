@@ -1,74 +1,98 @@
 # DocumentFileCompat
 
-A faster alternative to AndroidX's DocumentFile.
+[![Maven Central](https://img.shields.io/maven-central/v/com.lazygeniouz/dfc?label=Maven%20Central)](https://central.sonatype.com/artifact/com.lazygeniouz/dfc)
+[![Build](https://github.com/ItzNotABug/DocumentFileCompat/actions/workflows/build.yml/badge.svg)](https://github.com/ItzNotABug/DocumentFileCompat/actions/workflows/build.yml)
+[![Min SDK](https://img.shields.io/badge/minSdk-21%2B-brightgreen)](dfc/build.gradle)
+[![License](https://img.shields.io/github/license/ItzNotABug/DocumentFileCompat)](LICENSE.md)
 
-### The Problem with DocumentFile
+A faster alternative to AndroidX `DocumentFile`.
 
-It is horribly slow!\
-For **almost** every method, there is a query to **ContentResolver**.
+`DocumentFile` is convenient, but it can get painfully slow with Storage Access Framework
+directories. Methods like `findFile()`, `getName()`, `length()`, and custom model building can turn
+into a lot of repeated `ContentResolver` queries.
 
-The most common one is `DocumentFile.findFile()`, `DocumentFile.getName()` and other is building a
-Custom Data Model with multiple parameters.\
-This can take like a horrible amount of time.
+`DocumentFileCompat` keeps the familiar API, but gathers useful metadata while listing files so you
+do not keep paying for the same queries again and again.
 
-### Solution
+## What it supports
 
-`DocumentFileCompat` is a drop-in replacement which gathers relevant parameters when querying for
-files.\
-The performance can sometimes peak to 2x or quite higher, depending on the size of the folder.
+- Tree URIs via `fromTreeUri(...)`.
+- Single document URIs via `fromSingleUri(...)`.
+- Raw `File` access via `fromFile(...)`.
+- Common `DocumentFile`-style methods and getters.
+- Faster directory listing and metadata access.
+- Custom projections for lighter queries.
+- Convenience APIs like `count()`, `copyTo(destination)`, and `copyFrom(source)`.
 
-Check the screenshots below:
+## Installation
 
-[<img src="/screenshots/filecompat_directory_perf.jpeg" height="500"/>](/screenshots/filecompat_directory_perf.jpeg)
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-[<img src="/screenshots/filecompat_file_perf.jpeg" height="500"/>](/screenshots/filecompat_file_perf.jpeg)
+Use the latest version shown in the Maven Central badge above.
 
-**48 whopping seconds for directory listing compared to 3.5!** (Obviously, No competition with the
-Native File API).\
-Also extracting file information does not take that much time but the improvement is still
-significant.
+### Gradle
 
-**Note:** `DocumentFileCompat` is something that I used internally for some projects & therefore I
-didn't do much of file manipulation with it (only delete files) <strike>and therefore this API does
-not offer too much out of the box</strike>.\
-This is now a completely usable alternative to `DocumentFile`.
-
-### Installation
-
-#### Gradle
-
-```gradle
+```groovy
 dependencies {
-    implementation "com.lazygeniouz:dfc:$latest_version"
+    implementation "com.lazygeniouz:dfc:<version>"
 }
 ```
 
-#### Maven
+### Maven
 
 ```xml
 
 <dependency>
     <groupId>com.lazygeniouz</groupId>
     <artifactId>dfc</artifactId>
-    <version>$latest_version</version>
+    <version>${dfc.version}</version>
     <type>aar</type>
 </dependency>
 ```
 
-### Usage
+## Usage
 
-Almost all of the methods & getters are identical to `DocumentFile`, you'll just have to replace the
-imports.\
-Additional methods like `copyTo(destination: Uri)` & `copyFrom(source: Uri)` are added as well.
+The API is mostly the same as AndroidX `DocumentFile`; the main change is how you build the initial
+instance.
 
-#### Reference:
+```kotlin
+import com.lazygeniouz.dfc.file.DocumentFileCompat
 
-1. https://stackoverflow.com/a/42187419/6819340
-2. https://stackoverflow.com/a/63466997/6819340
+val directory = DocumentFileCompat.fromTreeUri(context, treeUri) ?: return
+val files = directory.listFiles()
 
-### Issues & Suggestions
+val file = directory.findFile("report.pdf")
+```
 
-Create a new issue if you experience any problem or have any suggestions.\
-I'll appreciate if you create a PR as well (if possible).
+Other entry points:
 
-Finally, don't forget to ⭐️ the library! :)
+- `DocumentFileCompat.fromSingleUri(context, uri)`
+- `DocumentFileCompat.fromFile(context, file)`
+
+Additional helpers like `count()`, `copyTo(destination)`, `copyFrom(source)`, and
+`listFiles(projection)` are available when you need them.
+
+## Performance
+
+The sample app includes simple comparisons against AndroidX `DocumentFile`. Results depend on the
+provider, device, and folder size, but large directories are where the difference shows up the most.
+
+| Directory listing                                                                                                   | File metadata                                                                                             |
+|---------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| [<img src="/screenshots/filecompat_directory_perf.jpeg" width="360"/>](/screenshots/filecompat_directory_perf.jpeg) | [<img src="/screenshots/filecompat_file_perf.jpeg" width="360"/>](/screenshots/filecompat_file_perf.jpeg) |
+
+One sample run had directory listing at roughly 48 seconds with `DocumentFile` compared to roughly
+3.5 seconds with `DocumentFileCompat`.
+
+Obviously, this is not trying to compete with the native `File` API. It is meant to make SAF-backed
+file access less painful.
+
+## References
+
+- [StackOverflow: Faster file lookup with document IDs](https://stackoverflow.com/a/42187419/6819340)
+- [StackOverflow: Storage Access Framework performance notes](https://stackoverflow.com/a/63466997/6819340)
+
+## Issues and Suggestions
+
+Create an issue if you run into a problem or have a suggestion. PRs are appreciated too, especially
+when they include a clear behavior change.
+
+And finally, if this saves you some time, a star on the repository would be appreciated.
