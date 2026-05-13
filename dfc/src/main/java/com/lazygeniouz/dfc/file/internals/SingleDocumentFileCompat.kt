@@ -78,12 +78,16 @@ internal class SingleDocumentFileCompat(
     }
 
     /**
-     * [SingleDocumentFileCompat] has limited access and permissions to the [uri].
+     * Rename succeeds when the underlying Uri carries `FLAG_SUPPORTS_RENAME`;
+     * ideally true for documents obtained from a tree grant via [DocumentFileCompat.listFiles].
      *
-     * @throws UnsupportedOperationException
+     * @return True if the rename was successful, False otherwise.
      */
     override fun renameTo(name: String): Boolean {
-        throw UnsupportedOperationException()
+        val newUri = fileController.renameTo(name)
+        val success = newUri != null
+        if (success) uri = newUri
+        return success
     }
 
     // Copies current file to the destination uri.

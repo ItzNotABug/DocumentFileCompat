@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import com.lazygeniouz.dfc.logger.ErrorLogger
 
@@ -125,10 +126,11 @@ internal object ResolverCompat {
         val childrenUri = createChildrenUri(uri)
         val listOfDocuments = arrayListOf<DocumentFileCompat>()
 
-        // ensure `Document.COLUMN_DOCUMENT_ID` is always included
-        val finalProjection = if (Document.COLUMN_DOCUMENT_ID !in projection) {
-            arrayOf(Document.COLUMN_DOCUMENT_ID, *projection)
-        } else projection
+        val finalProjection = arrayOf(
+            Document.COLUMN_DOCUMENT_ID, /* identifier */
+            Document.COLUMN_MIME_TYPE, /* for supporting rename via `isDirectory` check */
+            *projection
+        ).distinct().toTypedArray()
 
         val cursor = getCursor(context, childrenUri, finalProjection) ?: return emptyList()
 
@@ -168,14 +170,23 @@ internal object ResolverCompat {
                  */
                 val documentFlags = getLongOrDefault(cursor, flagsIndex, 0L).toInt()
 
-                TreeDocumentFileCompat(
-                    context, documentUri, documentName,
-                    documentSize, lastModifiedTime,
-                    documentMimeType, documentFlags
-                ).also { childFile ->
-                    childFile.parentFile = file
-                    listOfDocuments.add(childFile)
-                }
+                /* return correct document type */
+                val childFile: DocumentFileCompat =
+                    if (documentMimeType == Document.MIME_TYPE_DIR) {
+                        TreeDocumentFileCompat(
+                            context, documentUri, documentName,
+                            documentSize, lastModifiedTime,
+                            documentMimeType, documentFlags
+                        )
+                    } else {
+                        SingleDocumentFileCompat(
+                            context, documentUri, documentName,
+                            documentSize, lastModifiedTime,
+                            documentMimeType, documentFlags
+                        )
+                    }
+                childFile.parentFile = file
+                listOfDocuments.add(childFile)
             }
         }
 
