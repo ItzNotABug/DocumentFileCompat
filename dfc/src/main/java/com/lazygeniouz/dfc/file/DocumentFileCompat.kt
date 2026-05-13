@@ -105,10 +105,9 @@ abstract class DocumentFileCompat(
     /**
      * Rename a Document File / Folder.
      *
-     * Will throw [UnsupportedOperationException] when called on a [SingleDocumentFileCompat].
+     * Succeeds when the underlying Uri carries `FLAG_SUPPORTS_RENAME`.
      *
      * @return True if the rename was successful, False otherwise.
-     * @throws UnsupportedOperationException
      */
     abstract fun renameTo(name: String): Boolean
 
