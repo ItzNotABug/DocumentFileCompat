@@ -85,7 +85,12 @@ abstract class DocumentFileCompat(
      *
      * **NOTE: Unsupported clauses are ignored and logged.**
      */
-    abstract fun listFiles(vararg queries: Query): List<DocumentFileCompat>
+    // Open instead of abstract so existing external subclasses keep source compatibility.
+    open fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
+        throw UnsupportedOperationException(
+            "Queries are only supported for DocumentsProvider-backed tree URIs."
+        )
+    }
 
     /**
      * This will return the children count inside a **Directory** without creating [DocumentFileCompat] objects.
@@ -119,10 +124,9 @@ abstract class DocumentFileCompat(
     /**
      * Rename a Document File / Folder.
      *
-     * Will throw [UnsupportedOperationException] when called on a [SingleDocumentFileCompat].
+     * Succeeds when the underlying Uri carries `FLAG_SUPPORTS_RENAME`.
      *
      * @return True if the rename was successful, False otherwise.
-     * @throws UnsupportedOperationException
      */
     abstract fun renameTo(name: String): Boolean
 

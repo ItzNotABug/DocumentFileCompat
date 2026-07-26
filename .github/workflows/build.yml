@@ -26,4 +26,4 @@ jobs:
           cache: "gradle"
 
       - name: Build DFC
-        run: ./gradlew :dfc:assemble
+        run: ./gradlew :dfc:assemble :dfc:testDebugUnitTest

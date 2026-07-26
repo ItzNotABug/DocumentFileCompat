@@ -283,4 +283,17 @@ class QueryTest {
     fun `rawSelection rejects blank selection`() {
         Query.rawSelection("   ")
     }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `orderByAsc rejects unsafe column name`() {
+        Query.orderByAsc("${Document.COLUMN_DISPLAY_NAME}; DROP TABLE documents")
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `selection rejects unsafe attribute name`() {
+        val query = Query.equal("${Document.COLUMN_DISPLAY_NAME}) OR 1=1 --", "report.pdf")
+                as Query.Selection
+
+        query.toSelectionPart()
+    }
 }

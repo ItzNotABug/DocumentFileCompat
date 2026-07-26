@@ -13,6 +13,7 @@ import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.dfc.file.QueryDefaults
 import com.lazygeniouz.dfc.file.describe
 import com.lazygeniouz.dfc.file.toSelectionPart
+import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import com.lazygeniouz.dfc.logger.ErrorLogger
 
@@ -143,14 +144,15 @@ internal object ResolverCompat {
         val childrenUri = createChildrenUri(uri)
         val projectionQueries = queries.filterIsInstance<Query.Projection>()
         val projection = LinkedHashSet<String>().apply {
+            // Required internally to build child Uris and preserve child document behavior.
+            add(Document.COLUMN_DOCUMENT_ID)
+            add(Document.COLUMN_MIME_TYPE)
+
             if (projectionQueries.isEmpty()) {
                 addAll(QueryDefaults.DEFAULT_PROJECTION)
             } else {
                 projectionQueries.forEach { addAll(it.columns) }
             }
-
-            // Ensure document id is always available so we can build child document Uris.
-            add(Document.COLUMN_DOCUMENT_ID)
         }.toTypedArray()
 
         val ignoredQueries = mutableListOf<Query>()
@@ -329,7 +331,14 @@ internal object ResolverCompat {
              */
             if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
 
-            val idIndex = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
+            val idIndex = cursor.getColumnIndex(Document.COLUMN_DOCUMENT_ID)
+            if (idIndex == -1) {
+                ErrorLogger.logWarning(
+                    "Missing ${Document.COLUMN_DOCUMENT_ID} column in child document cursor."
+                )
+                return emptyList()
+            }
+
             val nameIndex = cursor.getColumnIndex(Document.COLUMN_DISPLAY_NAME)
             val sizeIndex = cursor.getColumnIndex(Document.COLUMN_SIZE)
             val modifiedIndex = cursor.getColumnIndex(Document.COLUMN_LAST_MODIFIED)
@@ -351,14 +360,23 @@ internal object ResolverCompat {
                  */
                 val documentFlags = getLongOrDefault(cursor, flagsIndex, 0L).toInt()
 
-                TreeDocumentFileCompat(
-                    context, documentUri, documentName,
-                    documentSize, lastModifiedTime,
-                    documentMimeType, documentFlags
-                ).also { childFile ->
-                    childFile.parentFile = file
-                    listOfDocuments.add(childFile)
-                }
+                /* return correct document type */
+                val childFile: DocumentFileCompat =
+                    if (documentMimeType == Document.MIME_TYPE_DIR) {
+                        TreeDocumentFileCompat(
+                            context, documentUri, documentName,
+                            documentSize, lastModifiedTime,
+                            documentMimeType, documentFlags
+                        )
+                    } else {
+                        SingleDocumentFileCompat(
+                            context, documentUri, documentName,
+                            documentSize, lastModifiedTime,
+                            documentMimeType, documentFlags
+                        )
+                    }
+                childFile.parentFile = file
+                listOfDocuments.add(childFile)
             }
         }
 

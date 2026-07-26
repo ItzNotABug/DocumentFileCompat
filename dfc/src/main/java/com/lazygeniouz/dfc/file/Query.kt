@@ -58,7 +58,7 @@ sealed class Query {
     companion object {
 
         /**
-         * Fetch only the given columns.
+         * Fetch the given columns, plus columns required internally to build results.
          *
          * Honored on API 21+.
          */
@@ -68,7 +68,7 @@ sealed class Query {
         }
 
         /**
-         * Fetch only the given columns.
+         * Fetch the given columns, plus columns required internally to build results.
          *
          * Honored on API 21+.
          */
@@ -88,6 +88,7 @@ sealed class Query {
          */
         @JvmStatic
         fun orderByAsc(column: String): Query {
+            requireSqlIdentifier(column, "column")
             return Sort(column, descending = false)
         }
 
@@ -98,6 +99,7 @@ sealed class Query {
          */
         @JvmStatic
         fun orderByDesc(column: String): Query {
+            requireSqlIdentifier(column, "column")
             return Sort(column, descending = true)
         }
 
@@ -266,6 +268,8 @@ sealed class Query {
         /**
          * Pass a raw SQL-style selection expression.
          *
+         * The selection is forwarded as-is; callers must keep column names trusted.
+         *
          * Honored on API 26+.
          */
         @JvmStatic
@@ -386,6 +390,14 @@ sealed class Query {
     }
 }
 
+private val SQL_IDENTIFIER_PATTERN = Regex("[A-Za-z_][A-Za-z0-9_.]*")
+
+private fun requireSqlIdentifier(identifier: String, label: String) {
+    require(SQL_IDENTIFIER_PATTERN.matches(identifier)) {
+        "$label must be a simple SQL column name."
+    }
+}
+
 internal object QueryDefaults {
     val DEFAULT_PROJECTION = listOf(
         Document.COLUMN_DOCUMENT_ID,
@@ -403,6 +415,7 @@ internal data class SelectionPart(
 )
 
 internal fun Query.Selection.toSelectionPart(): SelectionPart {
+    requireSqlIdentifier(attribute, "attribute")
     val attribute = attribute
 
     return when (operator) {
