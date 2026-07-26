@@ -11,8 +11,6 @@ import android.provider.DocumentsContract.Document
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.dfc.file.QueryDefaults
-import com.lazygeniouz.dfc.file.describe
-import com.lazygeniouz.dfc.file.toSelectionPart
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import com.lazygeniouz.dfc.logger.ErrorLogger
@@ -142,7 +140,7 @@ internal object ResolverCompat {
     ): List<DocumentFileCompat> {
         val uri = file.uri
         val childrenUri = createChildrenUri(uri)
-        val projectionQueries = queries.filterIsInstance<Query.Projection>()
+        val projectionQueries = queries.mapNotNull { it.projectionColumns() }
         val projection = LinkedHashSet<String>().apply {
             // Required internally to build child Uris and preserve child document behavior.
             add(Document.COLUMN_DOCUMENT_ID)
@@ -151,7 +149,7 @@ internal object ResolverCompat {
             if (projectionQueries.isEmpty()) {
                 addAll(QueryDefaults.DEFAULT_PROJECTION)
             } else {
-                projectionQueries.forEach { addAll(it.columns) }
+                projectionQueries.forEach { addAll(it) }
             }
         }.toTypedArray()
 
@@ -164,39 +162,46 @@ internal object ResolverCompat {
         var offset: Int? = null
 
         queries.forEach { query ->
-            when (query) {
-                is Query.Projection -> Unit
-                is Query.Sort -> {
-                    sortClauses += "${query.column} ${if (query.descending) "DESC" else "ASC"}"
-                }
+            if (query.projectionColumns() != null) return@forEach
 
-                is Query.Limit -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) limit = query.count
-                    else ignoredQueries += query
-                }
+            val sortClause = query.sortClause()
+            if (sortClause != null) {
+                sortClauses += sortClause
+                return@forEach
+            }
 
-                is Query.Offset -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) offset = query.count
-                    else ignoredQueries += query
-                }
+            val limitCount = query.limitCount()
+            if (limitCount != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) limit = limitCount
+                else ignoredQueries += query
+                return@forEach
+            }
 
-                is Query.Selection -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        val compiledSelection = query.toSelectionPart()
-                        selectionParts += compiledSelection.selection
-                        selectionArgs += compiledSelection.args
-                    } else {
-                        ignoredQueries += query
-                    }
-                }
+            val offsetCount = query.offsetCount()
+            if (offsetCount != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) offset = offsetCount
+                else ignoredQueries += query
+                return@forEach
+            }
 
-                is Query.RawSelection -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        selectionParts += "(${query.selection})"
-                        selectionArgs += query.args
-                    } else {
-                        ignoredQueries += query
-                    }
+            val selectionPart = query.selectionPart()
+            if (selectionPart != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    selectionParts += selectionPart.selection
+                    selectionArgs += selectionPart.args
+                } else {
+                    ignoredQueries += query
+                }
+                return@forEach
+            }
+
+            val rawSelectionPart = query.rawSelectionPart()
+            if (rawSelectionPart != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    selectionParts += rawSelectionPart.selection
+                    selectionArgs += rawSelectionPart.args
+                } else {
+                    ignoredQueries += query
                 }
             }
         }

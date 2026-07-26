@@ -2,7 +2,6 @@ package com.lazygeniouz.dfc.file
 
 import android.provider.DocumentsContract.Document
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -10,9 +9,7 @@ class QueryTest {
 
     @Test
     fun `nameContains escapes sql like wildcards`() {
-        val query = Query.nameContains("100%_done\\ready") as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.nameContains("100%_done\\ready").selectionPart()!!
 
         assertEquals(
             "(${Document.COLUMN_DISPLAY_NAME} LIKE ? ESCAPE '\\')",
@@ -23,9 +20,8 @@ class QueryTest {
 
     @Test
     fun `in with null adds is null clause`() {
-        val query = Query.`in`(Document.COLUMN_MIME_TYPE, null, "image/png") as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.`in`(Document.COLUMN_MIME_TYPE, null, "image/png")
+            .selectionPart()!!
 
         assertEquals(
             "((${Document.COLUMN_MIME_TYPE} IN (?)) OR (${Document.COLUMN_MIME_TYPE} IS NULL))",
@@ -36,9 +32,8 @@ class QueryTest {
 
     @Test
     fun `notIn with null adds is not null clause`() {
-        val query = Query.notIn(Document.COLUMN_MIME_TYPE, null, "image/png") as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.notIn(Document.COLUMN_MIME_TYPE, null, "image/png")
+            .selectionPart()!!
 
         assertEquals(
             "((${Document.COLUMN_MIME_TYPE} NOT IN (?)) AND (${Document.COLUMN_MIME_TYPE} IS NOT NULL))",
@@ -49,25 +44,24 @@ class QueryTest {
 
     @Test
     fun `equal with null becomes isNull selection`() {
-        val query = Query.equal(Document.COLUMN_MIME_TYPE, null) as Query.Selection
+        val selectionPart = Query.equal(Document.COLUMN_MIME_TYPE, null).selectionPart()!!
 
-        assertEquals(Query.Operator.IS_NULL, query.operator)
-        assertTrue(query.values.isEmpty())
+        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NULL)", selectionPart.selection)
+        assertTrue(selectionPart.args.isEmpty())
     }
 
     @Test
     fun `notEqual with null becomes isNotNull selection`() {
-        val query = Query.notEqual(Document.COLUMN_MIME_TYPE, null) as Query.Selection
+        val selectionPart = Query.notEqual(Document.COLUMN_MIME_TYPE, null).selectionPart()!!
 
-        assertEquals(Query.Operator.IS_NOT_NULL, query.operator)
-        assertTrue(query.values.isEmpty())
+        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NOT NULL)", selectionPart.selection)
+        assertTrue(selectionPart.args.isEmpty())
     }
 
     @Test
     fun `equal compiles to equality selection`() {
-        val query = Query.equal(Document.COLUMN_DISPLAY_NAME, "report.pdf") as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.equal(Document.COLUMN_DISPLAY_NAME, "report.pdf")
+            .selectionPart()!!
 
         assertEquals("(${Document.COLUMN_DISPLAY_NAME} = ?)", selectionPart.selection)
         assertEquals(listOf("report.pdf"), selectionPart.args)
@@ -75,9 +69,8 @@ class QueryTest {
 
     @Test
     fun `notEqual compiles to inequality selection`() {
-        val query = Query.notEqual(Document.COLUMN_DISPLAY_NAME, "report.pdf") as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.notEqual(Document.COLUMN_DISPLAY_NAME, "report.pdf")
+            .selectionPart()!!
 
         assertEquals("(${Document.COLUMN_DISPLAY_NAME} != ?)", selectionPart.selection)
         assertEquals(listOf("report.pdf"), selectionPart.args)
@@ -85,9 +78,7 @@ class QueryTest {
 
     @Test
     fun `greaterThan compiles correctly`() {
-        val query = Query.greaterThan(Document.COLUMN_SIZE, 1024L) as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.greaterThan(Document.COLUMN_SIZE, 1024L).selectionPart()!!
 
         assertEquals("(${Document.COLUMN_SIZE} > ?)", selectionPart.selection)
         assertEquals(listOf("1024"), selectionPart.args)
@@ -95,9 +86,8 @@ class QueryTest {
 
     @Test
     fun `greaterThanOrEqual compiles correctly`() {
-        val query = Query.greaterThanOrEqual(Document.COLUMN_SIZE, 1024L) as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.greaterThanOrEqual(Document.COLUMN_SIZE, 1024L)
+            .selectionPart()!!
 
         assertEquals("(${Document.COLUMN_SIZE} >= ?)", selectionPart.selection)
         assertEquals(listOf("1024"), selectionPart.args)
@@ -105,9 +95,7 @@ class QueryTest {
 
     @Test
     fun `lessThan compiles correctly`() {
-        val query = Query.lessThan(Document.COLUMN_SIZE, 1024L) as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.lessThan(Document.COLUMN_SIZE, 1024L).selectionPart()!!
 
         assertEquals("(${Document.COLUMN_SIZE} < ?)", selectionPart.selection)
         assertEquals(listOf("1024"), selectionPart.args)
@@ -115,9 +103,8 @@ class QueryTest {
 
     @Test
     fun `lessThanOrEqual compiles correctly`() {
-        val query = Query.lessThanOrEqual(Document.COLUMN_SIZE, 1024L) as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.lessThanOrEqual(Document.COLUMN_SIZE, 1024L)
+            .selectionPart()!!
 
         assertEquals("(${Document.COLUMN_SIZE} <= ?)", selectionPart.selection)
         assertEquals(listOf("1024"), selectionPart.args)
@@ -125,9 +112,7 @@ class QueryTest {
 
     @Test
     fun `between compiles correctly`() {
-        val query = Query.between(Document.COLUMN_SIZE, 10L, 20L) as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.between(Document.COLUMN_SIZE, 10L, 20L).selectionPart()!!
 
         assertEquals("(${Document.COLUMN_SIZE} BETWEEN ? AND ?)", selectionPart.selection)
         assertEquals(listOf("10", "20"), selectionPart.args)
@@ -135,9 +120,7 @@ class QueryTest {
 
     @Test
     fun `isNull compiles correctly`() {
-        val query = Query.isNull(Document.COLUMN_MIME_TYPE) as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.isNull(Document.COLUMN_MIME_TYPE).selectionPart()!!
 
         assertEquals("(${Document.COLUMN_MIME_TYPE} IS NULL)", selectionPart.selection)
         assertTrue(selectionPart.args.isEmpty())
@@ -145,9 +128,7 @@ class QueryTest {
 
     @Test
     fun `isNotNull compiles correctly`() {
-        val query = Query.isNotNull(Document.COLUMN_MIME_TYPE) as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.isNotNull(Document.COLUMN_MIME_TYPE).selectionPart()!!
 
         assertEquals("(${Document.COLUMN_MIME_TYPE} IS NOT NULL)", selectionPart.selection)
         assertTrue(selectionPart.args.isEmpty())
@@ -155,9 +136,7 @@ class QueryTest {
 
     @Test
     fun `like compiles correctly`() {
-        val query = Query.like(Document.COLUMN_DISPLAY_NAME, "report%") as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.like(Document.COLUMN_DISPLAY_NAME, "report%").selectionPart()!!
 
         assertEquals(
             "(${Document.COLUMN_DISPLAY_NAME} LIKE ? ESCAPE '\\')",
@@ -168,9 +147,8 @@ class QueryTest {
 
     @Test
     fun `notLike compiles correctly`() {
-        val query = Query.notLike(Document.COLUMN_DISPLAY_NAME, "report%") as Query.Selection
-
-        val selectionPart = query.toSelectionPart()
+        val selectionPart = Query.notLike(Document.COLUMN_DISPLAY_NAME, "report%")
+            .selectionPart()!!
 
         assertEquals(
             "(${Document.COLUMN_DISPLAY_NAME} NOT LIKE ? ESCAPE '\\')",
@@ -181,39 +159,35 @@ class QueryTest {
 
     @Test
     fun `filesOnly maps to mime type not equal directory`() {
-        val query = Query.filesOnly() as Query.Selection
+        val selectionPart = Query.filesOnly().selectionPart()!!
 
-        assertEquals(Document.COLUMN_MIME_TYPE, query.attribute)
-        assertEquals(Query.Operator.NOT_EQUAL, query.operator)
-        assertEquals(listOf(Document.MIME_TYPE_DIR), query.values)
+        assertEquals("(${Document.COLUMN_MIME_TYPE} != ?)", selectionPart.selection)
+        assertEquals(listOf(Document.MIME_TYPE_DIR), selectionPart.args)
     }
 
     @Test
     fun `directoriesOnly maps to mime type equal directory`() {
-        val query = Query.directoriesOnly() as Query.Selection
+        val selectionPart = Query.directoriesOnly().selectionPart()!!
 
-        assertEquals(Document.COLUMN_MIME_TYPE, query.attribute)
-        assertEquals(Query.Operator.EQUAL, query.operator)
-        assertEquals(listOf(Document.MIME_TYPE_DIR), query.values)
+        assertEquals("(${Document.COLUMN_MIME_TYPE} = ?)", selectionPart.selection)
+        assertEquals(listOf(Document.MIME_TYPE_DIR), selectionPart.args)
     }
 
     @Test
     fun `mimeTypeIn maps to in selection`() {
-        val query = Query.mimeTypeIn("image/png", "image/jpeg") as Query.Selection
+        val selectionPart = Query.mimeTypeIn("image/png", "image/jpeg").selectionPart()!!
 
-        assertEquals(Document.COLUMN_MIME_TYPE, query.attribute)
-        assertEquals(Query.Operator.IN, query.operator)
-        assertEquals(listOf("image/png", "image/jpeg"), query.values)
+        assertEquals("(${Document.COLUMN_MIME_TYPE} IN (?,?))", selectionPart.selection)
+        assertEquals(listOf("image/png", "image/jpeg"), selectionPart.args)
     }
 
     @Test
     fun `select returns projection query`() {
         val query = Query.select(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_SIZE)
-                as Query.Projection
 
         assertEquals(
             listOf(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_SIZE),
-            query.columns,
+            query.projectionColumns(),
         )
     }
 
@@ -221,42 +195,53 @@ class QueryTest {
     fun `projection delegates to select`() {
         @Suppress("DEPRECATION")
         val query = Query.projection(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_SIZE)
-                as Query.Projection
 
         assertEquals(
             listOf(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_SIZE),
-            query.columns,
+            query.projectionColumns(),
         )
     }
 
     @Test
     fun `orderByAsc returns ascending sort query`() {
-        val query = Query.orderByAsc(Document.COLUMN_DISPLAY_NAME) as Query.Sort
-
-        assertEquals(Document.COLUMN_DISPLAY_NAME, query.column)
-        assertFalse(query.descending)
+        assertEquals(
+            "${Document.COLUMN_DISPLAY_NAME} ASC",
+            Query.orderByAsc(Document.COLUMN_DISPLAY_NAME).sortClause(),
+        )
     }
 
     @Test
     fun `orderByDesc returns descending sort query`() {
-        val query = Query.orderByDesc(Document.COLUMN_DISPLAY_NAME) as Query.Sort
+        assertEquals(
+            "${Document.COLUMN_DISPLAY_NAME} DESC",
+            Query.orderByDesc(Document.COLUMN_DISPLAY_NAME).sortClause(),
+        )
+    }
 
-        assertEquals(Document.COLUMN_DISPLAY_NAME, query.column)
-        assertTrue(query.descending)
+    @Test
+    fun `document contract columns are accepted as identifiers`() {
+        listOf(
+            Document.COLUMN_DOCUMENT_ID,
+            Document.COLUMN_DISPLAY_NAME,
+            Document.COLUMN_SIZE,
+            Document.COLUMN_LAST_MODIFIED,
+            Document.COLUMN_MIME_TYPE,
+            Document.COLUMN_FLAGS,
+            Document.COLUMN_ICON,
+            Document.COLUMN_SUMMARY,
+        ).forEach { column ->
+            assertEquals("$column ASC", Query.orderByAsc(column).sortClause())
+        }
     }
 
     @Test
     fun `limit returns limit query`() {
-        val query = Query.limit(25) as Query.Limit
-
-        assertEquals(25, query.count)
+        assertEquals(25, Query.limit(25).limitCount())
     }
 
     @Test
     fun `offset returns offset query`() {
-        val query = Query.offset(10) as Query.Offset
-
-        assertEquals(10, query.count)
+        assertEquals(10, Query.offset(10).offsetCount())
     }
 
     @Test(expected = IllegalArgumentException::class)
@@ -291,9 +276,11 @@ class QueryTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun `selection rejects unsafe attribute name`() {
-        val query = Query.equal("${Document.COLUMN_DISPLAY_NAME}) OR 1=1 --", "report.pdf")
-                as Query.Selection
+        Query.equal("${Document.COLUMN_DISPLAY_NAME}) OR 1=1 --", "report.pdf")
+    }
 
-        query.toSelectionPart()
+    @Test(expected = IllegalArgumentException::class)
+    fun `orderByAsc rejects qualified column name`() {
+        Query.orderByAsc("documents.${Document.COLUMN_DISPLAY_NAME}")
     }
 }

@@ -92,7 +92,7 @@ val recentFiles = directory.listFiles(
 ```
 
 On API 21-25, only `Query.select(...)`, `Query.projection(...)`, `Query.orderByAsc(...)`, and
-`Query.orderByDesc(...)` are honored. On API 26+, filters, `Query.limit(...)`,
+`Query.orderByDesc(...)` are forwarded. On API 26+, filters, `Query.limit(...)`,
 `Query.offset(...)`, and `Query.rawSelection(...)` are also forwarded.
 
 Providers may still ignore supported query arguments. `DocumentFileCompat` forwards them, but the

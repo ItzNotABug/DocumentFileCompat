@@ -5,10 +5,20 @@ on:
   pull_request:
     types: [ opened, synchronize, reopened ]
     paths:
+      - ".github/workflows/build.yml"
+      - "*.gradle"
+      - "gradle.properties"
+      - "gradle/**"
+      - "app/**"
       - "dfc/**"
   push:
     branches: [ master ]
     paths:
+      - ".github/workflows/build.yml"
+      - "*.gradle"
+      - "gradle.properties"
+      - "gradle/**"
+      - "app/**"
       - "dfc/**"
 
 jobs:
@@ -25,5 +35,5 @@ jobs:
           java-version: "17"
           cache: "gradle"
 
-      - name: Build DFC
-        run: ./gradlew :dfc:assemble :dfc:testDebugUnitTest
+      - name: Build
+        run: ./gradlew :dfc:assemble :dfc:testDebugUnitTest :app:assembleDebug

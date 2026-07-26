@@ -23,7 +23,7 @@ allprojects {
     }
 
     plugins.withId("com.vanniktech.maven.publish.base") {
-        version = "1.6"
+        version = "1.7"
         group = "com.lazygeniouz"
 
         mavenPublishing {
