@@ -62,6 +62,7 @@ internal class TreeDocumentFileCompat(
         return fileController.listFiles()
     }
 
+    @JvmSynthetic
     override fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
         return fileController.listFiles(*queries)
     }

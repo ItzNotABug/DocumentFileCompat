@@ -85,10 +85,18 @@ abstract class DocumentFileCompat(
      *
      * **NOTE: Unsupported clauses are ignored and logged. Providers may still ignore forwarded clauses.**
      */
+    @JvmSynthetic
     open fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
         throw UnsupportedOperationException(
             "Queries are only supported for DocumentsProvider-backed tree URIs."
         )
+    }
+
+    /**
+     * Java-friendly alias for [listFiles] with [Query] clauses.
+     */
+    open fun queryFiles(vararg queries: Query): List<DocumentFileCompat> {
+        return listFiles(*queries)
     }
 
     /**

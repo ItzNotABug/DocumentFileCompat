@@ -36,6 +36,13 @@ allprojects {
                     "release"
             ))
         }
+
+        tasks.withType(org.gradle.jvm.tasks.Jar).matching { task ->
+            task.name == "dokkaJavadocJar"
+        }.configureEach { task ->
+            task.dependsOn(tasks.named("dokkaGenerateHtml"))
+            task.from(layout.buildDirectory.dir("dokka/html"))
+        }
     }
 }
 

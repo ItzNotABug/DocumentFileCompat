@@ -10,7 +10,6 @@ import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.file.Query
-import com.lazygeniouz.dfc.file.QueryDefaults
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import com.lazygeniouz.dfc.logger.ErrorLogger
@@ -147,7 +146,7 @@ internal object ResolverCompat {
             add(Document.COLUMN_MIME_TYPE)
 
             if (projectionQueries.isEmpty()) {
-                addAll(QueryDefaults.DEFAULT_PROJECTION)
+                addAll(fullProjection)
             } else {
                 projectionQueries.forEach { addAll(it) }
             }
@@ -187,8 +186,8 @@ internal object ResolverCompat {
             val selectionPart = query.selectionPart()
             if (selectionPart != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    selectionParts += selectionPart.selection
-                    selectionArgs += selectionPart.args
+                    selectionParts += selectionPart.first
+                    selectionArgs += selectionPart.second
                 } else {
                     ignoredQueries += query
                 }
@@ -198,8 +197,8 @@ internal object ResolverCompat {
             val rawSelectionPart = query.rawSelectionPart()
             if (rawSelectionPart != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    selectionParts += rawSelectionPart.selection
-                    selectionArgs += rawSelectionPart.args
+                    selectionParts += rawSelectionPart.first
+                    selectionArgs += rawSelectionPart.second
                 } else {
                     ignoredQueries += query
                 }

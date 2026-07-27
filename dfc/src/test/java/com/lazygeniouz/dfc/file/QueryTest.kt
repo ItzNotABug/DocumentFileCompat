@@ -13,9 +13,9 @@ class QueryTest {
 
         assertEquals(
             "(${Document.COLUMN_DISPLAY_NAME} LIKE ? ESCAPE '\\')",
-            selectionPart.selection,
+            selectionPart.first,
         )
-        assertEquals(listOf("%100\\%\\_done\\\\ready%"), selectionPart.args)
+        assertEquals(listOf("%100\\%\\_done\\\\ready%"), selectionPart.second)
     }
 
     @Test
@@ -25,9 +25,9 @@ class QueryTest {
 
         assertEquals(
             "((${Document.COLUMN_MIME_TYPE} IN (?)) OR (${Document.COLUMN_MIME_TYPE} IS NULL))",
-            selectionPart.selection,
+            selectionPart.first,
         )
-        assertEquals(listOf("image/png"), selectionPart.args)
+        assertEquals(listOf("image/png"), selectionPart.second)
     }
 
     @Test
@@ -37,25 +37,25 @@ class QueryTest {
 
         assertEquals(
             "((${Document.COLUMN_MIME_TYPE} NOT IN (?)) AND (${Document.COLUMN_MIME_TYPE} IS NOT NULL))",
-            selectionPart.selection,
+            selectionPart.first,
         )
-        assertEquals(listOf("image/png"), selectionPart.args)
+        assertEquals(listOf("image/png"), selectionPart.second)
     }
 
     @Test
     fun `equal with null becomes isNull selection`() {
         val selectionPart = Query.equal(Document.COLUMN_MIME_TYPE, null).selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NULL)", selectionPart.selection)
-        assertTrue(selectionPart.args.isEmpty())
+        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NULL)", selectionPart.first)
+        assertTrue(selectionPart.second.isEmpty())
     }
 
     @Test
     fun `notEqual with null becomes isNotNull selection`() {
         val selectionPart = Query.notEqual(Document.COLUMN_MIME_TYPE, null).selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NOT NULL)", selectionPart.selection)
-        assertTrue(selectionPart.args.isEmpty())
+        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NOT NULL)", selectionPart.first)
+        assertTrue(selectionPart.second.isEmpty())
     }
 
     @Test
@@ -63,8 +63,8 @@ class QueryTest {
         val selectionPart = Query.equal(Document.COLUMN_DISPLAY_NAME, "report.pdf")
             .selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_DISPLAY_NAME} = ?)", selectionPart.selection)
-        assertEquals(listOf("report.pdf"), selectionPart.args)
+        assertEquals("(${Document.COLUMN_DISPLAY_NAME} = ?)", selectionPart.first)
+        assertEquals(listOf("report.pdf"), selectionPart.second)
     }
 
     @Test
@@ -72,16 +72,16 @@ class QueryTest {
         val selectionPart = Query.notEqual(Document.COLUMN_DISPLAY_NAME, "report.pdf")
             .selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_DISPLAY_NAME} != ?)", selectionPart.selection)
-        assertEquals(listOf("report.pdf"), selectionPart.args)
+        assertEquals("(${Document.COLUMN_DISPLAY_NAME} != ?)", selectionPart.first)
+        assertEquals(listOf("report.pdf"), selectionPart.second)
     }
 
     @Test
     fun `greaterThan compiles correctly`() {
         val selectionPart = Query.greaterThan(Document.COLUMN_SIZE, 1024L).selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_SIZE} > ?)", selectionPart.selection)
-        assertEquals(listOf("1024"), selectionPart.args)
+        assertEquals("(${Document.COLUMN_SIZE} > ?)", selectionPart.first)
+        assertEquals(listOf("1024"), selectionPart.second)
     }
 
     @Test
@@ -89,16 +89,16 @@ class QueryTest {
         val selectionPart = Query.greaterThanOrEqual(Document.COLUMN_SIZE, 1024L)
             .selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_SIZE} >= ?)", selectionPart.selection)
-        assertEquals(listOf("1024"), selectionPart.args)
+        assertEquals("(${Document.COLUMN_SIZE} >= ?)", selectionPart.first)
+        assertEquals(listOf("1024"), selectionPart.second)
     }
 
     @Test
     fun `lessThan compiles correctly`() {
         val selectionPart = Query.lessThan(Document.COLUMN_SIZE, 1024L).selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_SIZE} < ?)", selectionPart.selection)
-        assertEquals(listOf("1024"), selectionPart.args)
+        assertEquals("(${Document.COLUMN_SIZE} < ?)", selectionPart.first)
+        assertEquals(listOf("1024"), selectionPart.second)
     }
 
     @Test
@@ -106,32 +106,32 @@ class QueryTest {
         val selectionPart = Query.lessThanOrEqual(Document.COLUMN_SIZE, 1024L)
             .selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_SIZE} <= ?)", selectionPart.selection)
-        assertEquals(listOf("1024"), selectionPart.args)
+        assertEquals("(${Document.COLUMN_SIZE} <= ?)", selectionPart.first)
+        assertEquals(listOf("1024"), selectionPart.second)
     }
 
     @Test
     fun `between compiles correctly`() {
         val selectionPart = Query.between(Document.COLUMN_SIZE, 10L, 20L).selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_SIZE} BETWEEN ? AND ?)", selectionPart.selection)
-        assertEquals(listOf("10", "20"), selectionPart.args)
+        assertEquals("(${Document.COLUMN_SIZE} BETWEEN ? AND ?)", selectionPart.first)
+        assertEquals(listOf("10", "20"), selectionPart.second)
     }
 
     @Test
     fun `isNull compiles correctly`() {
         val selectionPart = Query.isNull(Document.COLUMN_MIME_TYPE).selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NULL)", selectionPart.selection)
-        assertTrue(selectionPart.args.isEmpty())
+        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NULL)", selectionPart.first)
+        assertTrue(selectionPart.second.isEmpty())
     }
 
     @Test
     fun `isNotNull compiles correctly`() {
         val selectionPart = Query.isNotNull(Document.COLUMN_MIME_TYPE).selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NOT NULL)", selectionPart.selection)
-        assertTrue(selectionPart.args.isEmpty())
+        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NOT NULL)", selectionPart.first)
+        assertTrue(selectionPart.second.isEmpty())
     }
 
     @Test
@@ -140,9 +140,9 @@ class QueryTest {
 
         assertEquals(
             "(${Document.COLUMN_DISPLAY_NAME} LIKE ? ESCAPE '\\')",
-            selectionPart.selection,
+            selectionPart.first,
         )
-        assertEquals(listOf("report%"), selectionPart.args)
+        assertEquals(listOf("report%"), selectionPart.second)
     }
 
     @Test
@@ -152,33 +152,33 @@ class QueryTest {
 
         assertEquals(
             "(${Document.COLUMN_DISPLAY_NAME} NOT LIKE ? ESCAPE '\\')",
-            selectionPart.selection,
+            selectionPart.first,
         )
-        assertEquals(listOf("report%"), selectionPart.args)
+        assertEquals(listOf("report%"), selectionPart.second)
     }
 
     @Test
     fun `filesOnly maps to mime type not equal directory`() {
         val selectionPart = Query.filesOnly().selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_MIME_TYPE} != ?)", selectionPart.selection)
-        assertEquals(listOf(Document.MIME_TYPE_DIR), selectionPart.args)
+        assertEquals("(${Document.COLUMN_MIME_TYPE} != ?)", selectionPart.first)
+        assertEquals(listOf(Document.MIME_TYPE_DIR), selectionPart.second)
     }
 
     @Test
     fun `directoriesOnly maps to mime type equal directory`() {
         val selectionPart = Query.directoriesOnly().selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_MIME_TYPE} = ?)", selectionPart.selection)
-        assertEquals(listOf(Document.MIME_TYPE_DIR), selectionPart.args)
+        assertEquals("(${Document.COLUMN_MIME_TYPE} = ?)", selectionPart.first)
+        assertEquals(listOf(Document.MIME_TYPE_DIR), selectionPart.second)
     }
 
     @Test
     fun `mimeTypeIn maps to in selection`() {
         val selectionPart = Query.mimeTypeIn("image/png", "image/jpeg").selectionPart()!!
 
-        assertEquals("(${Document.COLUMN_MIME_TYPE} IN (?,?))", selectionPart.selection)
-        assertEquals(listOf("image/png", "image/jpeg"), selectionPart.args)
+        assertEquals("(${Document.COLUMN_MIME_TYPE} IN (?,?))", selectionPart.first)
+        assertEquals(listOf("image/png", "image/jpeg"), selectionPart.second)
     }
 
     @Test

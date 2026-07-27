@@ -81,14 +81,14 @@ class Query private constructor(
     }
 
     @JvmSynthetic
-    internal fun selectionPart(): SelectionPart? {
+    internal fun selectionPart(): Pair<String, List<String>>? {
         return if (kind == Kind.SELECTION) toSelectionPart() else null
     }
 
     @JvmSynthetic
-    internal fun rawSelectionPart(): SelectionPart? {
+    internal fun rawSelectionPart(): Pair<String, List<String>>? {
         return if (kind == Kind.RAW_SELECTION) {
-            SelectionPart("($rawSelectionValue)", rawSelectionArgs)
+            compiledSelection("($rawSelectionValue)", rawSelectionArgs)
         } else {
             null
         }
@@ -122,10 +122,10 @@ class Query private constructor(
         }
     }
 
-    private fun toSelectionPart(): SelectionPart {
+    private fun toSelectionPart(): Pair<String, List<String>> {
         return when (operator) {
-            Operator.EQUAL -> SelectionPart("($attribute = ?)", listOf(values.first().toSqlArg()))
-            Operator.NOT_EQUAL -> SelectionPart(
+            Operator.EQUAL -> compiledSelection("($attribute = ?)", listOf(values.first().toSqlArg()))
+            Operator.NOT_EQUAL -> compiledSelection(
                 "($attribute != ?)",
                 listOf(values.first().toSqlArg()),
             )
@@ -134,29 +134,29 @@ class Query private constructor(
             Operator.NOT_IN -> buildNotInSelection(attribute, values)
 
             Operator.GREATER_THAN ->
-                SelectionPart("($attribute > ?)", listOf(values.first().toSqlArg()))
+                compiledSelection("($attribute > ?)", listOf(values.first().toSqlArg()))
 
             Operator.GREATER_THAN_OR_EQUAL ->
-                SelectionPart("($attribute >= ?)", listOf(values.first().toSqlArg()))
+                compiledSelection("($attribute >= ?)", listOf(values.first().toSqlArg()))
 
             Operator.LESS_THAN ->
-                SelectionPart("($attribute < ?)", listOf(values.first().toSqlArg()))
+                compiledSelection("($attribute < ?)", listOf(values.first().toSqlArg()))
 
             Operator.LESS_THAN_OR_EQUAL ->
-                SelectionPart("($attribute <= ?)", listOf(values.first().toSqlArg()))
+                compiledSelection("($attribute <= ?)", listOf(values.first().toSqlArg()))
 
-            Operator.BETWEEN -> SelectionPart(
+            Operator.BETWEEN -> compiledSelection(
                 "($attribute BETWEEN ? AND ?)",
                 listOf(values[0].toSqlArg(), values[1].toSqlArg()),
             )
 
-            Operator.IS_NULL -> SelectionPart("($attribute IS NULL)", emptyList())
-            Operator.IS_NOT_NULL -> SelectionPart("($attribute IS NOT NULL)", emptyList())
+            Operator.IS_NULL -> compiledSelection("($attribute IS NULL)", emptyList())
+            Operator.IS_NOT_NULL -> compiledSelection("($attribute IS NOT NULL)", emptyList())
             Operator.LIKE ->
-                SelectionPart("($attribute LIKE ? ESCAPE '\\')", listOf(values.first().toSqlArg()))
+                compiledSelection("($attribute LIKE ? ESCAPE '\\')", listOf(values.first().toSqlArg()))
 
             Operator.NOT_LIKE ->
-                SelectionPart("($attribute NOT LIKE ? ESCAPE '\\')", listOf(values.first().toSqlArg()))
+                compiledSelection("($attribute NOT LIKE ? ESCAPE '\\')", listOf(values.first().toSqlArg()))
 
             null -> error("Selection query is missing an operator.")
         }
@@ -576,56 +576,44 @@ private fun requireAndroidColumnName(identifier: String, label: String) {
     }
 }
 
-internal object QueryDefaults {
-    val DEFAULT_PROJECTION = listOf(
-        Document.COLUMN_DOCUMENT_ID,
-        Document.COLUMN_DISPLAY_NAME,
-        Document.COLUMN_SIZE,
-        Document.COLUMN_LAST_MODIFIED,
-        Document.COLUMN_MIME_TYPE,
-        Document.COLUMN_FLAGS,
-    )
-}
-
-internal data class SelectionPart(
-    val selection: String,
-    val args: List<String>,
-)
-
-private fun buildInSelection(attribute: String, values: List<Any?>): SelectionPart {
+private fun buildInSelection(attribute: String, values: List<Any?>): Pair<String, List<String>> {
     val nonNullValues = values.filterNotNull()
     val hasNull = values.any { it == null }
 
     return when {
-        nonNullValues.isEmpty() && hasNull -> SelectionPart("($attribute IS NULL)", emptyList())
-        hasNull -> SelectionPart(
+        nonNullValues.isEmpty() && hasNull -> compiledSelection("($attribute IS NULL)", emptyList())
+        hasNull -> compiledSelection(
             "(($attribute IN (${nonNullValues.joinToString(",") { "?" }})) OR ($attribute IS NULL))",
             nonNullValues.map { it.toSqlArg() },
         )
 
-        else -> SelectionPart(
+        else -> compiledSelection(
             "($attribute IN (${nonNullValues.joinToString(",") { "?" }}))",
             nonNullValues.map { it.toSqlArg() },
         )
     }
 }
 
-private fun buildNotInSelection(attribute: String, values: List<Any?>): SelectionPart {
+private fun buildNotInSelection(attribute: String, values: List<Any?>): Pair<String, List<String>> {
     val nonNullValues = values.filterNotNull()
     val hasNull = values.any { it == null }
 
     return when {
-        nonNullValues.isEmpty() && hasNull -> SelectionPart("($attribute IS NOT NULL)", emptyList())
-        hasNull -> SelectionPart(
+        nonNullValues.isEmpty() && hasNull -> compiledSelection("($attribute IS NOT NULL)", emptyList())
+        hasNull -> compiledSelection(
             "(($attribute NOT IN (${nonNullValues.joinToString(",") { "?" }})) AND ($attribute IS NOT NULL))",
             nonNullValues.map { it.toSqlArg() },
         )
 
-        else -> SelectionPart(
+        else -> compiledSelection(
             "($attribute NOT IN (${nonNullValues.joinToString(",") { "?" }}))",
             nonNullValues.map { it.toSqlArg() },
         )
     }
+}
+
+private fun compiledSelection(selection: String, args: List<String>): Pair<String, List<String>> {
+    return selection to args
 }
 
 private fun Any?.toSqlArg(): String {

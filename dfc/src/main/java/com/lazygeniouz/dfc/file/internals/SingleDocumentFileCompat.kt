@@ -65,6 +65,7 @@ internal class SingleDocumentFileCompat(
      *
      * @throws UnsupportedOperationException
      */
+    @JvmSynthetic
     override fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
         throw UnsupportedOperationException(
             "Queries are only supported for DocumentsProvider-backed tree URIs."
