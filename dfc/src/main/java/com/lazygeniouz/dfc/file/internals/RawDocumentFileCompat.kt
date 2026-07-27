@@ -107,15 +107,16 @@ internal class RawDocumentFileCompat(context: Context, var file: File) :
     /**
      * Returns list of files using File API.
      *
-     * Note: [projection] is ignored as the File API doesn't support it.
+     * [projection] is ignored here because it only affects provider column fetching,
+     * not which child files are returned.
      */
     override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
         return listFiles()
     }
 
     /**
-     * Raw file queries are not backed by a DocumentsProvider and therefore don't support
-     * provider-level query arguments.
+     * Raw file listings are not backed by a DocumentsProvider, so [Query] clauses
+     * cannot be applied with provider-level filtering, ordering, or paging semantics.
      *
      * @throws UnsupportedOperationException
      */
