@@ -118,6 +118,11 @@ class QueryTest {
         assertEquals(listOf("10", "20"), selectionPart.second)
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun `between rejects reversed numeric range`() {
+        Query.between(Document.COLUMN_SIZE, 20L, 10L)
+    }
+
     @Test
     fun `isNull compiles correctly`() {
         val selectionPart = Query.isNull(Document.COLUMN_MIME_TYPE).selectionPart()!!
@@ -281,6 +286,21 @@ class QueryTest {
     @Test(expected = IllegalArgumentException::class)
     fun `orderByAsc rejects qualified column name`() {
         Query.orderByAsc("documents.${Document.COLUMN_DISPLAY_NAME}")
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `selection rejects unsupported value type`() {
+        Query.equal(Document.COLUMN_DISPLAY_NAME, Any())
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `selection rejects non finite number`() {
+        Query.greaterThan(Document.COLUMN_SIZE, Double.NaN)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `in rejects unsupported value type`() {
+        Query.`in`(Document.COLUMN_DISPLAY_NAME, "report.pdf", Any())
     }
 }
 

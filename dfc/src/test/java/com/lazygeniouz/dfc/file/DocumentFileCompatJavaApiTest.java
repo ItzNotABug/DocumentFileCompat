@@ -16,10 +16,12 @@ public class DocumentFileCompatJavaApiTest {
         Query[] queries = new Query[] {
             Query.filesOnly(),
             Query.orderByDesc(Document.COLUMN_LAST_MODIFIED),
+            Query.in(Document.COLUMN_MIME_TYPE, "image/png", "image/jpeg"),
+            Query.notIn(Document.COLUMN_MIME_TYPE, "application/pdf"),
             Query.limit(100),
         };
 
-        assertEquals(3, queries.length);
+        assertEquals(5, queries.length);
     }
 
     @SuppressWarnings("unused")

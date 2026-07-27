@@ -16,6 +16,7 @@ import com.lazygeniouz.dfc.file.Query.Companion.rawSelection
  * - API 26+: filter queries, [limit], [offset], and [rawSelection] are also forwarded.
  *
  * Unsupported clauses are ignored and logged. Providers may still ignore forwarded clauses.
+ * Filter values must be null, String, Number, or Boolean.
  */
 sealed class Query private constructor() {
 
@@ -187,10 +188,13 @@ sealed class Query private constructor() {
         /**
          * Attribute is between [start] and [endInclusive].
          *
+         * Numeric ranges require [start] <= [endInclusive].
+         *
          * Forwarded on API 26+.
          */
         @JvmStatic
         fun between(attribute: String, start: Any, endInclusive: Any): Query {
+            requireBetweenOrder(start, endInclusive)
             return selection(attribute, "between($attribute)") { column ->
                 compiledSelection(
                     "($column BETWEEN ? AND ?)",
@@ -502,8 +506,32 @@ sealed class Query private constructor() {
         private fun Any?.toSqlArg(): String {
             return when (this) {
                 null -> "null"
+                is String -> this
                 is Boolean -> if (this) "1" else "0"
-                else -> toString()
+                is Float -> {
+                    require(isFinite()) { "query value must be finite." }
+                    toString()
+                }
+
+                is Double -> {
+                    require(isFinite()) { "query value must be finite." }
+                    toString()
+                }
+
+                is Number -> toString()
+                else -> throw IllegalArgumentException(
+                    "query value must be null, String, Number, or Boolean."
+                )
+            }
+        }
+
+        private fun requireBetweenOrder(start: Any, endInclusive: Any) {
+            if (start !is Number || endInclusive !is Number) return
+
+            val startValue = start.toSqlArg().toBigDecimal()
+            val endValue = endInclusive.toSqlArg().toBigDecimal()
+            require(startValue <= endValue) {
+                "between start must be <= endInclusive."
             }
         }
     }
