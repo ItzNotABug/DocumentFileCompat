@@ -44,4 +44,20 @@ public class DocumentFileCompatJavaApiTest {
             )
         );
     }
+
+    @Test
+    public void internalCursorHelperIsSyntheticOnJavaSide() {
+        Method[] methods = DocumentFileCompat.Companion.getClass().getMethods();
+
+        assertTrue(
+            Arrays.stream(methods).anyMatch(method ->
+                method.getName().startsWith("makeFromCursor") && method.isSynthetic()
+            )
+        );
+        assertFalse(
+            Arrays.stream(methods).anyMatch(method ->
+                method.getName().equals("makeFromCursor") && !method.isSynthetic()
+            )
+        );
+    }
 }

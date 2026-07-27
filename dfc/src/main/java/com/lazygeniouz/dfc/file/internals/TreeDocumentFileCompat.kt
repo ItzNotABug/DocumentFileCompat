@@ -1,13 +1,11 @@
 package com.lazygeniouz.dfc.file.internals
 
 import android.content.Context
-import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.file.Query
-import com.lazygeniouz.dfc.logger.ErrorLogger
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 
 /**
@@ -131,37 +129,20 @@ internal class TreeDocumentFileCompat(
             } else uri
 
             ResolverCompat.getCursor(context, treeUri, ResolverCompat.fullProjection)
-                ?.let { cursor -> return makeFromCursor(context, treeUri, cursor) }
+                ?.let { cursor ->
+                    return DocumentFileCompat.makeFromCursor(
+                        cursor,
+                        "Exception while building a tree document file",
+                    ) { name, size, lastModified, mimeType, flags ->
+                        TreeDocumentFileCompat(
+                            context, treeUri,
+                            name, size,
+                            lastModified, mimeType, flags,
+                        )
+                    }
+                }
 
             return null
-        }
-
-        @JvmSynthetic
-        internal fun makeFromCursor(
-            context: Context,
-            treeUri: Uri,
-            cursor: Cursor,
-        ): TreeDocumentFileCompat? {
-            return try {
-                cursor.use {
-                    if (!it.moveToFirst()) return@use null
-
-                    val documentName: String = it.getString(1)
-                    val documentSize: Long = it.getLong(2)
-                    val documentLastModified: Long = it.getLong(3)
-                    val documentMimeType: String = it.getString(4)
-                    val documentFlags: Int = it.getLong(5).toInt()
-
-                    TreeDocumentFileCompat(
-                        context, treeUri,
-                        documentName, documentSize,
-                        documentLastModified, documentMimeType, documentFlags
-                    )
-                }
-            } catch (exception: Exception) {
-                ErrorLogger.logError("Exception while building a tree document file", exception)
-                null
-            }
         }
     }
 }

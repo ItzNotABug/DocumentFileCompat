@@ -6,6 +6,7 @@ import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Build
 import android.provider.DocumentsContract.Document
+import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -24,7 +25,11 @@ class DocumentFileCompatMakeTest {
         val uri = Uri.parse("content://com.lazygeniouz.dfc.test.documents/document/root%2Fnotes.txt")
         val cursor = throwingCursor(documentCursor("text/plain"))
 
-        assertNull(SingleDocumentFileCompat.makeFromCursor(context, uri, cursor))
+        assertNull(
+            DocumentFileCompat.makeFromCursor(cursor, "test") { name, size, lastModified, mime, flags ->
+                SingleDocumentFileCompat(context, uri, name, size, lastModified, mime, flags)
+            }
+        )
     }
 
     @Test
@@ -33,7 +38,11 @@ class DocumentFileCompatMakeTest {
         val uri = Uri.parse("content://com.lazygeniouz.dfc.test.documents/tree/root/document/root")
         val cursor = throwingCursor(documentCursor(Document.MIME_TYPE_DIR))
 
-        assertNull(TreeDocumentFileCompat.makeFromCursor(context, uri, cursor))
+        assertNull(
+            DocumentFileCompat.makeFromCursor(cursor, "test") { name, size, lastModified, mime, flags ->
+                TreeDocumentFileCompat(context, uri, name, size, lastModified, mime, flags)
+            }
+        )
     }
 
     private fun documentCursor(mimeType: String): Cursor {

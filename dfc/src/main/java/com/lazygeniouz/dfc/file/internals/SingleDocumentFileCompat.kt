@@ -1,11 +1,9 @@
 package com.lazygeniouz.dfc.file.internals
 
 import android.content.Context
-import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract
 import com.lazygeniouz.dfc.file.DocumentFileCompat
-import com.lazygeniouz.dfc.logger.ErrorLogger
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 
 /**
@@ -115,37 +113,20 @@ internal class SingleDocumentFileCompat(
             if (!DocumentsContract.isDocumentUri(context, self)) return null
 
             ResolverCompat.getCursor(context, self, ResolverCompat.fullProjection)
-                ?.let { cursor -> return makeFromCursor(context, self, cursor) }
+                ?.let { cursor ->
+                    return DocumentFileCompat.makeFromCursor(
+                        cursor,
+                        "Exception while building a single document file",
+                    ) { name, size, lastModified, mimeType, flags ->
+                        SingleDocumentFileCompat(
+                            context, self,
+                            name, size,
+                            lastModified, mimeType, flags,
+                        )
+                    }
+                }
 
             return null
-        }
-
-        @JvmSynthetic
-        internal fun makeFromCursor(
-            context: Context,
-            self: Uri,
-            cursor: Cursor,
-        ): SingleDocumentFileCompat? {
-            return try {
-                cursor.use {
-                    if (!it.moveToFirst()) return@use null
-
-                    val documentName: String = it.getString(1)
-                    val documentSize: Long = it.getLong(2)
-                    val documentLastModified: Long = it.getLong(3)
-                    val documentMimeType: String = it.getString(4)
-                    val documentFlags: Int = it.getLong(5).toInt()
-
-                    SingleDocumentFileCompat(
-                        context, self,
-                        documentName, documentSize,
-                        documentLastModified, documentMimeType, documentFlags
-                    )
-                }
-            } catch (exception: Exception) {
-                ErrorLogger.logError("Exception while building a single document file", exception)
-                null
-            }
         }
     }
 }

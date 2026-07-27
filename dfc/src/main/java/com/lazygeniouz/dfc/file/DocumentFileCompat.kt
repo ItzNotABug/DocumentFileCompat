@@ -2,6 +2,7 @@ package com.lazygeniouz.dfc.file
 
 import android.content.ContentResolver
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
@@ -9,6 +10,7 @@ import com.lazygeniouz.dfc.controller.DocumentController
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.logger.ErrorLogger
 import java.io.File
 
 /**
@@ -263,6 +265,42 @@ abstract class DocumentFileCompat(
         internal fun isTreeUri(uri: Uri): Boolean {
             val paths = uri.pathSegments
             return paths.size >= 2 && "tree" == paths[0]
+        }
+
+        @JvmSynthetic
+        internal fun <T : DocumentFileCompat> makeFromCursor(
+            cursor: Cursor,
+            errorMessage: String,
+            buildFile: (
+                documentName: String,
+                documentSize: Long,
+                documentLastModified: Long,
+                documentMimeType: String,
+                documentFlags: Int,
+            ) -> T,
+        ): T? {
+            return try {
+                cursor.use {
+                    if (!it.moveToFirst()) return@use null
+
+                    val documentName: String = it.getString(1)
+                    val documentSize: Long = it.getLong(2)
+                    val documentLastModified: Long = it.getLong(3)
+                    val documentMimeType: String = it.getString(4)
+                    val documentFlags: Int = it.getLong(5).toInt()
+
+                    buildFile(
+                        documentName,
+                        documentSize,
+                        documentLastModified,
+                        documentMimeType,
+                        documentFlags,
+                    )
+                }
+            } catch (exception: Exception) {
+                ErrorLogger.logError(errorMessage, exception)
+                null
+            }
         }
     }
 }
