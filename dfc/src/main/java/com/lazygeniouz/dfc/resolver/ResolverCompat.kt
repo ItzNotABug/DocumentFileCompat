@@ -334,6 +334,13 @@ internal object ResolverCompat {
             val sizeIndex = cursor.getColumnIndex(Document.COLUMN_SIZE)
             val modifiedIndex = cursor.getColumnIndex(Document.COLUMN_LAST_MODIFIED)
             val mimeIndex = cursor.getColumnIndex(Document.COLUMN_MIME_TYPE)
+            if (mimeIndex == -1) {
+                ErrorLogger.logWarning(
+                    "Missing ${Document.COLUMN_MIME_TYPE} column in child document cursor."
+                )
+                return emptyList()
+            }
+
             val flagsIndex = cursor.getColumnIndex(Document.COLUMN_FLAGS)
 
             while (cursor.moveToNext()) {
@@ -343,7 +350,7 @@ internal object ResolverCompat {
                 val documentName = getStringOrDefault(cursor, nameIndex)
                 val documentSize = getLongOrDefault(cursor, sizeIndex)
                 val lastModifiedTime = getLongOrDefault(cursor, modifiedIndex, -1L)
-                val documentMimeType = getStringOrDefault(cursor, mimeIndex)
+                val documentMimeType = cursor.getString(mimeIndex) ?: continue
 
                 /**
                  * Default flags to 0 (no capabilities) when not included.

@@ -248,7 +248,8 @@ sealed class Query private constructor() {
         /**
          * Pass a raw SQL-style selection expression.
          *
-         * The selection is forwarded as-is; callers must keep column names trusted.
+         * The selection is grouped and forwarded as a SQL selection clause.
+         * Callers must keep column names trusted.
          * Use this for provider-specific expressions or qualified column references.
          *
          * Forwarded on API 26+.

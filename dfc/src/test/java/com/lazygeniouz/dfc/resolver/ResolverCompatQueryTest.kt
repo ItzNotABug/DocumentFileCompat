@@ -188,6 +188,50 @@ class ResolverCompatQueryTest {
     }
 
     @Test
+    fun `query returns empty list when provider omits required mime type column`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+        provider.omitMimeTypeColumn = true
+
+        val children = root.listFiles(Query.select(Document.COLUMN_DISPLAY_NAME))
+
+        assertTrue(children.isEmpty())
+    }
+
+    @Test
+    fun `query forwards raw selection and offset`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        root.listFiles(
+            Query.rawSelection("${Document.COLUMN_DISPLAY_NAME} LIKE ?", "notes%"),
+            Query.offset(2),
+        )
+
+        assertEquals(
+            "(${Document.COLUMN_DISPLAY_NAME} LIKE ?)",
+            provider.lastQueryArgs?.getString(ContentResolver.QUERY_ARG_SQL_SELECTION),
+        )
+        assertArrayEquals(
+            arrayOf("notes%"),
+            provider.lastQueryArgs?.getStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS),
+        )
+        assertEquals(2, provider.lastQueryArgs?.getInt(ContentResolver.QUERY_ARG_OFFSET))
+    }
+
+    @Test
     fun `query listFiles rejects non-directory tree documents`() {
         val context = RuntimeEnvironment.getApplication()
         val file = TreeDocumentFileCompat(
@@ -247,6 +291,8 @@ class ResolverCompatQueryTest {
             private set
 
         var omitDocumentIdColumn: Boolean = false
+
+        var omitMimeTypeColumn: Boolean = false
 
         private val documents = listOf(
             TestDocument(
@@ -319,6 +365,7 @@ class ResolverCompatQueryTest {
         ): Cursor {
             val columns = (projection?.toList() ?: ResolverCompat.fullProjection.toList())
                 .filterNot { omitDocumentIdColumn && it == Document.COLUMN_DOCUMENT_ID }
+                .filterNot { omitMimeTypeColumn && it == Document.COLUMN_MIME_TYPE }
             return MatrixCursor(columns.toTypedArray()).apply {
                 documents.forEach { document ->
                     addRow(columns.map { column -> document.valueFor(column) })
