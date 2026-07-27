@@ -96,12 +96,14 @@ internal object ResolverCompat {
      */
     internal fun count(context: Context, uri: Uri): Int {
         val childrenUri = createChildrenUri(uri)
+        val cursor = getCursor(context, childrenUri, iconProjection) ?: return 0
+        return count(cursor)
+    }
+
+    @JvmSynthetic
+    internal fun count(cursor: Cursor): Int {
         return try {
-            getCursor(
-                context,
-                childrenUri,
-                iconProjection
-            )?.use { cursor -> cursor.count } ?: 0
+            cursor.use { it.count }
         } catch (exception: Exception) {
             ErrorLogger.logError("Exception while counting child documents", exception)
             0
@@ -130,7 +132,8 @@ internal object ResolverCompat {
         file: DocumentFileCompat,
         projection: Array<String> = fullProjection,
     ): List<DocumentFileCompat> {
-        return listFiles(context, file, Query.select(*projection))
+        val effectiveProjection = projection.ifEmpty { fullProjection }
+        return listFiles(context, file, Query.select(*effectiveProjection))
     }
 
     /**
@@ -307,7 +310,8 @@ internal object ResolverCompat {
         )
     }
 
-    private fun buildDocumentList(
+    @JvmSynthetic
+    internal fun buildDocumentList(
         context: Context,
         file: DocumentFileCompat,
         treeUri: Uri,

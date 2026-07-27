@@ -172,6 +172,34 @@ class ResolverCompatQueryTest {
     }
 
     @Test
+    @Config(sdk = [Build.VERSION_CODES.M])
+    fun `legacy projection listFiles accepts empty projection`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        val children = root.listFiles(emptyArray<String>())
+
+        assertEquals(
+            listOf(
+                Document.COLUMN_DOCUMENT_ID,
+                Document.COLUMN_MIME_TYPE,
+                Document.COLUMN_DISPLAY_NAME,
+                Document.COLUMN_SIZE,
+                Document.COLUMN_LAST_MODIFIED,
+                Document.COLUMN_FLAGS,
+            ),
+            provider.lastChildProjection?.toList(),
+        )
+        assertEquals(2, children.size)
+    }
+
+    @Test
     fun `query returns empty list when provider omits required document id column`() {
         val context = RuntimeEnvironment.getApplication()
         val root = TreeDocumentFileCompat(
@@ -183,7 +211,10 @@ class ResolverCompatQueryTest {
         )
         provider.omitDocumentIdColumn = true
 
-        val children = root.listFiles(Query.select(Document.COLUMN_DISPLAY_NAME))
+        val children = root.listFiles(
+            Query.select(Document.COLUMN_DISPLAY_NAME),
+            Query.orderByAsc(Document.COLUMN_DISPLAY_NAME),
+        )
 
         assertTrue(children.isEmpty())
     }
@@ -200,7 +231,10 @@ class ResolverCompatQueryTest {
         )
         provider.omitMimeTypeColumn = true
 
-        val children = root.listFiles(Query.select(Document.COLUMN_DISPLAY_NAME))
+        val children = root.listFiles(
+            Query.select(Document.COLUMN_DISPLAY_NAME),
+            Query.orderByAsc(Document.COLUMN_DISPLAY_NAME),
+        )
 
         assertTrue(children.isEmpty())
     }
@@ -234,21 +268,13 @@ class ResolverCompatQueryTest {
 
     @Test
     fun `count returns zero when child cursor count throws`() {
-        val context = RuntimeEnvironment.getApplication()
-        val root = TreeDocumentFileCompat(
-            context = context,
-            documentUri = TestDocumentsProvider.rootDocumentUri(),
-            documentName = "root",
-            documentMimeType = Document.MIME_TYPE_DIR,
-            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
-        )
-        provider.throwOnChildCursorCount = true
+        val cursor = throwingCursor(childCursor(), throwOnCount = true)
 
-        assertEquals(0, root.count())
+        assertEquals(0, ResolverCompat.count(cursor))
     }
 
     @Test
-    fun `query returns empty list when child cursor iteration throws`() {
+    fun `build document list returns empty list when child cursor iteration throws`() {
         val context = RuntimeEnvironment.getApplication()
         val root = TreeDocumentFileCompat(
             context = context,
@@ -257,9 +283,9 @@ class ResolverCompatQueryTest {
             documentMimeType = Document.MIME_TYPE_DIR,
             documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
         )
-        provider.throwOnChildCursorGetString = true
+        val cursor = throwingCursor(childCursor(), throwOnGetString = true)
 
-        val children = root.listFiles(Query.select(Document.COLUMN_DISPLAY_NAME))
+        val children = ResolverCompat.buildDocumentList(context, root, root.uri, cursor)
 
         assertTrue(children.isEmpty())
     }
@@ -327,10 +353,6 @@ class ResolverCompatQueryTest {
 
         var omitMimeTypeColumn: Boolean = false
 
-        var throwOnChildCursorCount: Boolean = false
-
-        var throwOnChildCursorGetString: Boolean = false
-
         private val documents = listOf(
             TestDocument(
                 id = ROOT_ID,
@@ -375,7 +397,7 @@ class ResolverCompatQueryTest {
             lastLegacySelection = null
             lastLegacySelectionArgs = null
             lastLegacySortOrder = sortOrder
-            return childCursorOf(projection, documents.filterNot { it.id == ROOT_ID })
+            return cursorOf(projection, documents.filterNot { it.id == ROOT_ID })
         }
 
         override fun queryChildDocuments(
@@ -385,7 +407,7 @@ class ResolverCompatQueryTest {
         ): Cursor {
             lastChildProjection = projection?.copyProjection()
             lastQueryArgs = queryArgs?.let(::Bundle)
-            return childCursorOf(projection, documents.filterNot { it.id == ROOT_ID })
+            return cursorOf(projection, documents.filterNot { it.id == ROOT_ID })
         }
 
         override fun openDocument(
@@ -406,29 +428,6 @@ class ResolverCompatQueryTest {
             return MatrixCursor(columns.toTypedArray()).apply {
                 documents.forEach { document ->
                     addRow(columns.map { column -> document.valueFor(column) })
-                }
-            }
-        }
-
-        private fun childCursorOf(
-            projection: Array<out String>?,
-            documents: List<TestDocument>,
-        ): Cursor {
-            val cursor = cursorOf(projection, documents)
-            if (!throwOnChildCursorCount && !throwOnChildCursorGetString) return cursor
-
-            return object : CursorWrapper(cursor) {
-
-                override fun getCount(): Int {
-                    if (throwOnChildCursorCount) throw IllegalStateException("count failed")
-                    return super.getCount()
-                }
-
-                override fun getString(columnIndex: Int): String? {
-                    if (throwOnChildCursorGetString) {
-                        throw IllegalStateException("getString failed")
-                    }
-                    return super.getString(columnIndex)
                 }
             }
         }
@@ -471,6 +470,40 @@ class ResolverCompatQueryTest {
                     ROOT_ID,
                 )
             }
+        }
+    }
+}
+
+private fun childCursor(): Cursor {
+    return MatrixCursor(ResolverCompat.fullProjection).apply {
+        addRow(
+            arrayOf<Any?>(
+                "root/notes.txt",
+                "notes.txt",
+                128L,
+                0L,
+                "text/plain",
+                Document.FLAG_SUPPORTS_WRITE,
+            )
+        )
+    }
+}
+
+private fun throwingCursor(
+    cursor: Cursor,
+    throwOnCount: Boolean = false,
+    throwOnGetString: Boolean = false,
+): Cursor {
+    return object : CursorWrapper(cursor) {
+
+        override fun getCount(): Int {
+            if (throwOnCount) throw IllegalStateException("count failed")
+            return super.getCount()
+        }
+
+        override fun getString(columnIndex: Int): String? {
+            if (throwOnGetString) throw IllegalStateException("getString failed")
+            return super.getString(columnIndex)
         }
     }
 }
