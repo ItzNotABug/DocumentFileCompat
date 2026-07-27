@@ -77,13 +77,6 @@ abstract class DocumentFileCompat(
      * List child documents using [Query] clauses.
      *
      * This is only supported for tree-backed directories.
-     *
-     * API support for SAF child-document queries:
-     *
-     * - API 21-25: only [Query.select], [Query.projection], [Query.orderByAsc], and [Query.orderByDesc] are forwarded.
-     * - API 26+: filter queries, [Query.limit], [Query.offset], and [Query.rawSelection] are also forwarded.
-     *
-     * **NOTE: Unsupported clauses are ignored and logged. Providers may still ignore forwarded clauses.**
      */
     @JvmSynthetic
     open fun listFiles(vararg queries: Query): List<DocumentFileCompat> {

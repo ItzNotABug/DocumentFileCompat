@@ -249,20 +249,7 @@ internal object ResolverCompat {
      * Get [Cursor] from [ContentResolver.query] with given [projection] on a given [uri].
      */
     internal fun getCursor(context: Context, uri: Uri, projection: Array<String>): Cursor? {
-        return try {
-            context.contentResolver.query(
-                uri, projection, null, null, null
-            )
-        } catch (exception: Exception) {
-            /**
-             * This exception can occur in scenarios such as -
-             *
-             * - The Uri became invalid due to external changes (e.g., permissions revoked, storage unmounted, etc.).
-             * - The file or directory represented by this Uri was probably deleted or became `inaccessible` after the Uri was obtained but before this operation was performed.
-             */
-            ErrorLogger.logError("Exception while building the Cursor", exception)
-            null
-        }
+        return getCursor(context, uri, projection, null, null, null, null)
     }
 
     /**

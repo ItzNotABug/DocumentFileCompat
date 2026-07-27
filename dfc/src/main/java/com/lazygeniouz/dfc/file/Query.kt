@@ -5,7 +5,6 @@ import com.lazygeniouz.dfc.file.Query.Companion.limit
 import com.lazygeniouz.dfc.file.Query.Companion.offset
 import com.lazygeniouz.dfc.file.Query.Companion.orderByAsc
 import com.lazygeniouz.dfc.file.Query.Companion.orderByDesc
-import com.lazygeniouz.dfc.file.Query.Companion.projection
 import com.lazygeniouz.dfc.file.Query.Companion.rawSelection
 
 /**
@@ -13,153 +12,54 @@ import com.lazygeniouz.dfc.file.Query.Companion.rawSelection
  *
  * For tree-backed SAF directories:
  *
- * - API 21-25: only [projection], [orderByAsc], and [orderByDesc] are forwarded.
+ * - API 21-25: only [select], [orderByAsc], and [orderByDesc] are forwarded.
  * - API 26+: filter queries, [limit], [offset], and [rawSelection] are also forwarded.
  *
  * Unsupported clauses are ignored and logged. Providers may still ignore forwarded clauses.
  */
 class Query private constructor(
-    private val kind: Kind,
-    private val columns: List<String>,
-    private val sortColumn: String,
-    private val sortDescending: Boolean,
-    private val count: Int,
-    private val attribute: String,
-    private val operator: Operator?,
-    private val values: List<Any?>,
-    private val rawSelectionValue: String,
-    private val rawSelectionArgs: List<String>,
+    private val projectionColumnsValue: List<String>? = null,
+    private val sortClauseValue: String? = null,
+    private val limitCountValue: Int? = null,
+    private val offsetCountValue: Int? = null,
+    private val selectionPartValue: Pair<String, List<String>>? = null,
+    private val rawSelectionPartValue: Pair<String, List<String>>? = null,
+    private val description: String,
 ) {
-
-    private enum class Kind {
-        PROJECTION,
-        SORT,
-        LIMIT,
-        OFFSET,
-        SELECTION,
-        RAW_SELECTION,
-    }
-
-    private enum class Operator {
-        EQUAL,
-        NOT_EQUAL,
-        IN,
-        NOT_IN,
-        GREATER_THAN,
-        GREATER_THAN_OR_EQUAL,
-        LESS_THAN,
-        LESS_THAN_OR_EQUAL,
-        BETWEEN,
-        IS_NULL,
-        IS_NOT_NULL,
-        LIKE,
-        NOT_LIKE,
-    }
 
     @JvmSynthetic
     internal fun projectionColumns(): List<String>? {
-        return if (kind == Kind.PROJECTION) columns else null
+        return projectionColumnsValue
     }
 
     @JvmSynthetic
     internal fun sortClause(): String? {
-        return if (kind == Kind.SORT) {
-            "$sortColumn ${if (sortDescending) "DESC" else "ASC"}"
-        } else {
-            null
-        }
+        return sortClauseValue
     }
 
     @JvmSynthetic
     internal fun limitCount(): Int? {
-        return if (kind == Kind.LIMIT) count else null
+        return limitCountValue
     }
 
     @JvmSynthetic
     internal fun offsetCount(): Int? {
-        return if (kind == Kind.OFFSET) count else null
+        return offsetCountValue
     }
 
     @JvmSynthetic
     internal fun selectionPart(): Pair<String, List<String>>? {
-        return if (kind == Kind.SELECTION) toSelectionPart() else null
+        return selectionPartValue
     }
 
     @JvmSynthetic
     internal fun rawSelectionPart(): Pair<String, List<String>>? {
-        return if (kind == Kind.RAW_SELECTION) {
-            compiledSelection("($rawSelectionValue)", rawSelectionArgs)
-        } else {
-            null
-        }
+        return rawSelectionPartValue
     }
 
     @JvmSynthetic
     internal fun describe(): String {
-        return when (kind) {
-            Kind.PROJECTION -> "projection"
-            Kind.SORT -> if (sortDescending) "orderByDesc($sortColumn)" else "orderByAsc($sortColumn)"
-            Kind.LIMIT -> "limit($count)"
-            Kind.OFFSET -> "offset($count)"
-            Kind.SELECTION -> when (operator) {
-                Operator.EQUAL -> "equal($attribute)"
-                Operator.NOT_EQUAL -> "notEqual($attribute)"
-                Operator.IN -> "in($attribute)"
-                Operator.NOT_IN -> "notIn($attribute)"
-                Operator.GREATER_THAN -> "greaterThan($attribute)"
-                Operator.GREATER_THAN_OR_EQUAL -> "greaterThanOrEqual($attribute)"
-                Operator.LESS_THAN -> "lessThan($attribute)"
-                Operator.LESS_THAN_OR_EQUAL -> "lessThanOrEqual($attribute)"
-                Operator.BETWEEN -> "between($attribute)"
-                Operator.IS_NULL -> "isNull($attribute)"
-                Operator.IS_NOT_NULL -> "isNotNull($attribute)"
-                Operator.LIKE -> "like($attribute)"
-                Operator.NOT_LIKE -> "notLike($attribute)"
-                null -> "selection"
-            }
-
-            Kind.RAW_SELECTION -> "rawSelection"
-        }
-    }
-
-    private fun toSelectionPart(): Pair<String, List<String>> {
-        return when (operator) {
-            Operator.EQUAL -> compiledSelection("($attribute = ?)", listOf(values.first().toSqlArg()))
-            Operator.NOT_EQUAL -> compiledSelection(
-                "($attribute != ?)",
-                listOf(values.first().toSqlArg()),
-            )
-
-            Operator.IN -> buildInSelection(attribute, values)
-            Operator.NOT_IN -> buildNotInSelection(attribute, values)
-
-            Operator.GREATER_THAN ->
-                compiledSelection("($attribute > ?)", listOf(values.first().toSqlArg()))
-
-            Operator.GREATER_THAN_OR_EQUAL ->
-                compiledSelection("($attribute >= ?)", listOf(values.first().toSqlArg()))
-
-            Operator.LESS_THAN ->
-                compiledSelection("($attribute < ?)", listOf(values.first().toSqlArg()))
-
-            Operator.LESS_THAN_OR_EQUAL ->
-                compiledSelection("($attribute <= ?)", listOf(values.first().toSqlArg()))
-
-            Operator.BETWEEN -> compiledSelection(
-                "($attribute BETWEEN ? AND ?)",
-                listOf(values[0].toSqlArg(), values[1].toSqlArg()),
-            )
-
-            Operator.IS_NULL -> compiledSelection("($attribute IS NULL)", emptyList())
-            Operator.IS_NOT_NULL -> compiledSelection("($attribute IS NOT NULL)", emptyList())
-            Operator.LIKE ->
-                compiledSelection("($attribute LIKE ? ESCAPE '\\')", listOf(values.first().toSqlArg()))
-
-            Operator.NOT_LIKE ->
-                compiledSelection("($attribute NOT LIKE ? ESCAPE '\\')", listOf(values.first().toSqlArg()))
-
-            null -> error("Selection query is missing an operator.")
-        }
+        return description
     }
 
     companion object {
@@ -171,21 +71,10 @@ class Query private constructor(
          */
         @JvmStatic
         fun select(vararg columns: String): Query {
-            return projectionQuery(columns.toList())
-        }
-
-        /**
-         * Fetch the given columns, plus columns required internally to build results.
-         *
-         * Forwarded on API 21+.
-         */
-        @Deprecated(
-            message = "Use select(...) instead.",
-            replaceWith = ReplaceWith("select(*columns)"),
-        )
-        @JvmStatic
-        fun projection(vararg columns: String): Query {
-            return select(*columns)
+            return Query(
+                projectionColumnsValue = columns.toList(),
+                description = "select",
+            )
         }
 
         /**
@@ -195,7 +84,6 @@ class Query private constructor(
          */
         @JvmStatic
         fun orderByAsc(column: String): Query {
-            requireAndroidColumnName(column, "column")
             return sortQuery(column, descending = false)
         }
 
@@ -206,7 +94,6 @@ class Query private constructor(
          */
         @JvmStatic
         fun orderByDesc(column: String): Query {
-            requireAndroidColumnName(column, "column")
             return sortQuery(column, descending = true)
         }
 
@@ -218,7 +105,10 @@ class Query private constructor(
         @JvmStatic
         fun limit(count: Int): Query {
             require(count >= 0) { "limit must be >= 0" }
-            return countQuery(Kind.LIMIT, count)
+            return Query(
+                limitCountValue = count,
+                description = "limit($count)",
+            )
         }
 
         /**
@@ -229,7 +119,10 @@ class Query private constructor(
         @JvmStatic
         fun offset(count: Int): Query {
             require(count >= 0) { "offset must be >= 0" }
-            return countQuery(Kind.OFFSET, count)
+            return Query(
+                offsetCountValue = count,
+                description = "offset($count)",
+            )
         }
 
         /**
@@ -240,7 +133,9 @@ class Query private constructor(
         @JvmStatic
         fun equal(attribute: String, value: Any?): Query {
             return if (value == null) isNull(attribute)
-            else selection(attribute, Operator.EQUAL, listOf(value))
+            else selection(attribute, "equal($attribute)") { column ->
+                compiledSelection("($column = ?)", listOf(value.toSqlArg()))
+            }
         }
 
         /**
@@ -251,7 +146,9 @@ class Query private constructor(
         @JvmStatic
         fun notEqual(attribute: String, value: Any?): Query {
             return if (value == null) isNotNull(attribute)
-            else selection(attribute, Operator.NOT_EQUAL, listOf(value))
+            else selection(attribute, "notEqual($attribute)") { column ->
+                compiledSelection("($column != ?)", listOf(value.toSqlArg()))
+            }
         }
 
         /**
@@ -262,7 +159,9 @@ class Query private constructor(
         @JvmStatic
         fun `in`(attribute: String, vararg values: Any?): Query {
             require(values.isNotEmpty()) { "in requires at least one value" }
-            return selection(attribute, Operator.IN, values.toList())
+            return selection(attribute, "in($attribute)") { column ->
+                buildInSelection(column, values.toList())
+            }
         }
 
         /**
@@ -273,7 +172,9 @@ class Query private constructor(
         @JvmStatic
         fun notIn(attribute: String, vararg values: Any?): Query {
             require(values.isNotEmpty()) { "notIn requires at least one value" }
-            return selection(attribute, Operator.NOT_IN, values.toList())
+            return selection(attribute, "notIn($attribute)") { column ->
+                buildNotInSelection(column, values.toList())
+            }
         }
 
         /**
@@ -283,7 +184,9 @@ class Query private constructor(
          */
         @JvmStatic
         fun greaterThan(attribute: String, value: Any): Query {
-            return selection(attribute, Operator.GREATER_THAN, listOf(value))
+            return selection(attribute, "greaterThan($attribute)") { column ->
+                compiledSelection("($column > ?)", listOf(value.toSqlArg()))
+            }
         }
 
         /**
@@ -293,7 +196,9 @@ class Query private constructor(
          */
         @JvmStatic
         fun greaterThanOrEqual(attribute: String, value: Any): Query {
-            return selection(attribute, Operator.GREATER_THAN_OR_EQUAL, listOf(value))
+            return selection(attribute, "greaterThanOrEqual($attribute)") { column ->
+                compiledSelection("($column >= ?)", listOf(value.toSqlArg()))
+            }
         }
 
         /**
@@ -303,7 +208,9 @@ class Query private constructor(
          */
         @JvmStatic
         fun lessThan(attribute: String, value: Any): Query {
-            return selection(attribute, Operator.LESS_THAN, listOf(value))
+            return selection(attribute, "lessThan($attribute)") { column ->
+                compiledSelection("($column < ?)", listOf(value.toSqlArg()))
+            }
         }
 
         /**
@@ -313,7 +220,9 @@ class Query private constructor(
          */
         @JvmStatic
         fun lessThanOrEqual(attribute: String, value: Any): Query {
-            return selection(attribute, Operator.LESS_THAN_OR_EQUAL, listOf(value))
+            return selection(attribute, "lessThanOrEqual($attribute)") { column ->
+                compiledSelection("($column <= ?)", listOf(value.toSqlArg()))
+            }
         }
 
         /**
@@ -323,7 +232,12 @@ class Query private constructor(
          */
         @JvmStatic
         fun between(attribute: String, start: Any, endInclusive: Any): Query {
-            return selection(attribute, Operator.BETWEEN, listOf(start, endInclusive))
+            return selection(attribute, "between($attribute)") { column ->
+                compiledSelection(
+                    "($column BETWEEN ? AND ?)",
+                    listOf(start.toSqlArg(), endInclusive.toSqlArg()),
+                )
+            }
         }
 
         /**
@@ -333,7 +247,9 @@ class Query private constructor(
          */
         @JvmStatic
         fun isNull(attribute: String): Query {
-            return selection(attribute, Operator.IS_NULL, emptyList())
+            return selection(attribute, "isNull($attribute)") { column ->
+                compiledSelection("($column IS NULL)", emptyList())
+            }
         }
 
         /**
@@ -343,7 +259,9 @@ class Query private constructor(
          */
         @JvmStatic
         fun isNotNull(attribute: String): Query {
-            return selection(attribute, Operator.IS_NOT_NULL, emptyList())
+            return selection(attribute, "isNotNull($attribute)") { column ->
+                compiledSelection("($column IS NOT NULL)", emptyList())
+            }
         }
 
         /**
@@ -353,7 +271,9 @@ class Query private constructor(
          */
         @JvmStatic
         fun like(attribute: String, pattern: String): Query {
-            return selection(attribute, Operator.LIKE, listOf(pattern))
+            return selection(attribute, "like($attribute)") { column ->
+                compiledSelection("($column LIKE ? ESCAPE '\\')", listOf(pattern))
+            }
         }
 
         /**
@@ -363,7 +283,9 @@ class Query private constructor(
          */
         @JvmStatic
         fun notLike(attribute: String, pattern: String): Query {
-            return selection(attribute, Operator.NOT_LIKE, listOf(pattern))
+            return selection(attribute, "notLike($attribute)") { column ->
+                compiledSelection("($column NOT LIKE ? ESCAPE '\\')", listOf(pattern))
+            }
         }
 
         /**
@@ -377,7 +299,10 @@ class Query private constructor(
         @JvmStatic
         fun rawSelection(selection: String, vararg args: String): Query {
             require(selection.isNotBlank()) { "selection must not be blank" }
-            return rawSelectionQuery(selection, args.toList())
+            return Query(
+                rawSelectionPartValue = compiledSelection("($selection)", args.toList()),
+                description = "rawSelection",
+            )
         }
 
         /**
@@ -483,79 +408,23 @@ class Query private constructor(
             return lessThan(Document.COLUMN_LAST_MODIFIED, timestampMillis)
         }
 
-        private fun projectionQuery(columns: List<String>): Query {
-            return Query(
-                Kind.PROJECTION,
-                columns,
-                "",
-                false,
-                0,
-                "",
-                null,
-                emptyList(),
-                "",
-                emptyList(),
-            )
-        }
-
         private fun sortQuery(column: String, descending: Boolean): Query {
+            requireAndroidColumnName(column, "column")
             return Query(
-                Kind.SORT,
-                emptyList(),
-                column,
-                descending,
-                0,
-                "",
-                null,
-                emptyList(),
-                "",
-                emptyList(),
+                sortClauseValue = "$column ${if (descending) "DESC" else "ASC"}",
+                description = if (descending) "orderByDesc($column)" else "orderByAsc($column)",
             )
         }
 
-        private fun countQuery(kind: Kind, count: Int): Query {
-            return Query(
-                kind,
-                emptyList(),
-                "",
-                false,
-                count,
-                "",
-                null,
-                emptyList(),
-                "",
-                emptyList(),
-            )
-        }
-
-        private fun selection(attribute: String, operator: Operator, values: List<Any?>): Query {
+        private fun selection(
+            attribute: String,
+            description: String,
+            build: (String) -> Pair<String, List<String>>,
+        ): Query {
             requireAndroidColumnName(attribute, "attribute")
             return Query(
-                Kind.SELECTION,
-                emptyList(),
-                "",
-                false,
-                0,
-                attribute,
-                operator,
-                values,
-                "",
-                emptyList(),
-            )
-        }
-
-        private fun rawSelectionQuery(selection: String, args: List<String>): Query {
-            return Query(
-                Kind.RAW_SELECTION,
-                emptyList(),
-                "",
-                false,
-                0,
-                "",
-                null,
-                emptyList(),
-                selection,
-                args,
+                selectionPartValue = build(attribute),
+                description = description,
             )
         }
 

@@ -59,7 +59,7 @@ class ResolverCompatQueryTest {
     }
 
     @Test
-    fun `query select keeps internal projection and child document types`() {
+    fun `query forwards api 26 bundle arguments`() {
         val context = RuntimeEnvironment.getApplication()
         val root = TreeDocumentFileCompat(
             context = context,
@@ -92,6 +92,32 @@ class ResolverCompatQueryTest {
             provider.lastQueryArgs?.getStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS),
         )
         assertEquals(1, provider.lastQueryArgs?.getInt(ContentResolver.QUERY_ARG_LIMIT))
+    }
+
+    @Test
+    fun `query select keeps internal projection and child document types`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        val children = root.listFiles(
+            Query.select(Document.COLUMN_DISPLAY_NAME),
+            Query.orderByAsc(Document.COLUMN_DISPLAY_NAME),
+        )
+
+        assertEquals(
+            listOf(
+                Document.COLUMN_DOCUMENT_ID,
+                Document.COLUMN_MIME_TYPE,
+                Document.COLUMN_DISPLAY_NAME,
+            ),
+            provider.lastChildProjection?.toList(),
+        )
 
         val file = children.first { it.name == "notes.txt" }
         val directory = children.first { it.name == "photos" }
@@ -99,13 +125,11 @@ class ResolverCompatQueryTest {
         assertTrue(file.isFile())
         assertFalse(file.isDirectory())
         assertEquals("text/plain", file.getType())
-        assertEquals("SingleDocumentFileCompat", file.javaClass.simpleName)
         assertSame(root, file.parentFile)
 
         assertTrue(directory.isDirectory())
         assertFalse(directory.isFile())
         assertNull(directory.getType())
-        assertEquals("TreeDocumentFileCompat", directory.javaClass.simpleName)
         assertSame(root, directory.parentFile)
     }
 

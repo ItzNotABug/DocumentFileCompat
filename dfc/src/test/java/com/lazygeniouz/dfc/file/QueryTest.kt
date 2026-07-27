@@ -192,17 +192,6 @@ class QueryTest {
     }
 
     @Test
-    fun `projection delegates to select`() {
-        @Suppress("DEPRECATION")
-        val query = Query.projection(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_SIZE)
-
-        assertEquals(
-            listOf(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_SIZE),
-            query.projectionColumns(),
-        )
-    }
-
-    @Test
     fun `orderByAsc returns ascending sort query`() {
         assertEquals(
             "${Document.COLUMN_DISPLAY_NAME} ASC",
