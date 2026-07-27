@@ -273,3 +273,23 @@ class QueryTest {
         Query.orderByAsc("documents.${Document.COLUMN_DISPLAY_NAME}")
     }
 }
+
+private fun Query.projectionColumns(): List<String>? {
+    return Query.projectionColumns(this)
+}
+
+private fun Query.sortClause(): String? {
+    return Query.sortClause(this)
+}
+
+private fun Query.limitCount(): Int? {
+    return Query.limitCount(this)
+}
+
+private fun Query.offsetCount(): Int? {
+    return Query.offsetCount(this)
+}
+
+private fun Query.selectionPart(): Pair<String, List<String>>? {
+    return Query.selectionPart(this)
+}

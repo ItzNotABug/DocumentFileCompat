@@ -17,50 +17,7 @@ import com.lazygeniouz.dfc.file.Query.Companion.rawSelection
  *
  * Unsupported clauses are ignored and logged. Providers may still ignore forwarded clauses.
  */
-class Query private constructor(
-    private val projectionColumnsValue: List<String>? = null,
-    private val sortClauseValue: String? = null,
-    private val limitCountValue: Int? = null,
-    private val offsetCountValue: Int? = null,
-    private val selectionPartValue: Pair<String, List<String>>? = null,
-    private val rawSelectionPartValue: Pair<String, List<String>>? = null,
-    private val description: String,
-) {
-
-    @JvmSynthetic
-    internal fun projectionColumns(): List<String>? {
-        return projectionColumnsValue
-    }
-
-    @JvmSynthetic
-    internal fun sortClause(): String? {
-        return sortClauseValue
-    }
-
-    @JvmSynthetic
-    internal fun limitCount(): Int? {
-        return limitCountValue
-    }
-
-    @JvmSynthetic
-    internal fun offsetCount(): Int? {
-        return offsetCountValue
-    }
-
-    @JvmSynthetic
-    internal fun selectionPart(): Pair<String, List<String>>? {
-        return selectionPartValue
-    }
-
-    @JvmSynthetic
-    internal fun rawSelectionPart(): Pair<String, List<String>>? {
-        return rawSelectionPartValue
-    }
-
-    @JvmSynthetic
-    internal fun describe(): String {
-        return description
-    }
+sealed class Query private constructor() {
 
     companion object {
 
@@ -71,7 +28,7 @@ class Query private constructor(
          */
         @JvmStatic
         fun select(vararg columns: String): Query {
-            return Query(
+            return QuerySpec(
                 projectionColumnsValue = columns.toList(),
                 description = "select",
             )
@@ -105,7 +62,7 @@ class Query private constructor(
         @JvmStatic
         fun limit(count: Int): Query {
             require(count >= 0) { "limit must be >= 0" }
-            return Query(
+            return QuerySpec(
                 limitCountValue = count,
                 description = "limit($count)",
             )
@@ -119,7 +76,7 @@ class Query private constructor(
         @JvmStatic
         fun offset(count: Int): Query {
             require(count >= 0) { "offset must be >= 0" }
-            return Query(
+            return QuerySpec(
                 offsetCountValue = count,
                 description = "offset($count)",
             )
@@ -299,7 +256,7 @@ class Query private constructor(
         @JvmStatic
         fun rawSelection(selection: String, vararg args: String): Query {
             require(selection.isNotBlank()) { "selection must not be blank" }
-            return Query(
+            return QuerySpec(
                 rawSelectionPartValue = compiledSelection("($selection)", args.toList()),
                 description = "rawSelection",
             )
@@ -408,9 +365,48 @@ class Query private constructor(
             return lessThan(Document.COLUMN_LAST_MODIFIED, timestampMillis)
         }
 
+        @JvmSynthetic
+        internal fun projectionColumns(query: Query): List<String>? {
+            return query.asSpec().projectionColumnsValue
+        }
+
+        @JvmSynthetic
+        internal fun sortClause(query: Query): String? {
+            return query.asSpec().sortClauseValue
+        }
+
+        @JvmSynthetic
+        internal fun limitCount(query: Query): Int? {
+            return query.asSpec().limitCountValue
+        }
+
+        @JvmSynthetic
+        internal fun offsetCount(query: Query): Int? {
+            return query.asSpec().offsetCountValue
+        }
+
+        @JvmSynthetic
+        internal fun selectionPart(query: Query): Pair<String, List<String>>? {
+            return query.asSpec().selectionPartValue
+        }
+
+        @JvmSynthetic
+        internal fun rawSelectionPart(query: Query): Pair<String, List<String>>? {
+            return query.asSpec().rawSelectionPartValue
+        }
+
+        @JvmSynthetic
+        internal fun describe(query: Query): String {
+            return query.asSpec().description
+        }
+
+        private fun Query.asSpec(): QuerySpec {
+            return this as QuerySpec
+        }
+
         private fun sortQuery(column: String, descending: Boolean): Query {
             requireAndroidColumnName(column, "column")
-            return Query(
+            return QuerySpec(
                 sortClauseValue = "$column ${if (descending) "DESC" else "ASC"}",
                 description = if (descending) "orderByDesc($column)" else "orderByAsc($column)",
             )
@@ -422,7 +418,7 @@ class Query private constructor(
             build: (String) -> Pair<String, List<String>>,
         ): Query {
             requireAndroidColumnName(attribute, "attribute")
-            return Query(
+            return QuerySpec(
                 selectionPartValue = build(attribute),
                 description = description,
             )
@@ -434,61 +430,88 @@ class Query private constructor(
                 .replace("%", "\\%")
                 .replace("_", "\\_")
         }
+
+        private val androidColumnNamePattern = Regex("[A-Za-z_][A-Za-z0-9_]*")
+
+        private fun requireAndroidColumnName(identifier: String, label: String) {
+            require(androidColumnNamePattern.matches(identifier)) {
+                "$label must be a simple Android contract column name."
+            }
+        }
+
+        private fun buildInSelection(
+            attribute: String,
+            values: List<Any?>,
+        ): Pair<String, List<String>> {
+            val nonNullValues = values.filterNotNull()
+            val hasNull = values.any { it == null }
+
+            return when {
+                nonNullValues.isEmpty() && hasNull -> compiledSelection(
+                    "($attribute IS NULL)",
+                    emptyList(),
+                )
+
+                hasNull -> compiledSelection(
+                    "(($attribute IN (${nonNullValues.joinToString(",") { "?" }})) OR ($attribute IS NULL))",
+                    nonNullValues.map { it.toSqlArg() },
+                )
+
+                else -> compiledSelection(
+                    "($attribute IN (${nonNullValues.joinToString(",") { "?" }}))",
+                    nonNullValues.map { it.toSqlArg() },
+                )
+            }
+        }
+
+        private fun buildNotInSelection(
+            attribute: String,
+            values: List<Any?>,
+        ): Pair<String, List<String>> {
+            val nonNullValues = values.filterNotNull()
+            val hasNull = values.any { it == null }
+
+            return when {
+                nonNullValues.isEmpty() && hasNull -> compiledSelection(
+                    "($attribute IS NOT NULL)",
+                    emptyList(),
+                )
+
+                hasNull -> compiledSelection(
+                    "(($attribute NOT IN (${nonNullValues.joinToString(",") { "?" }})) AND ($attribute IS NOT NULL))",
+                    nonNullValues.map { it.toSqlArg() },
+                )
+
+                else -> compiledSelection(
+                    "($attribute NOT IN (${nonNullValues.joinToString(",") { "?" }}))",
+                    nonNullValues.map { it.toSqlArg() },
+                )
+            }
+        }
+
+        private fun compiledSelection(
+            selection: String,
+            args: List<String>,
+        ): Pair<String, List<String>> {
+            return selection to args
+        }
+
+        private fun Any?.toSqlArg(): String {
+            return when (this) {
+                null -> "null"
+                is Boolean -> if (this) "1" else "0"
+                else -> toString()
+            }
+        }
     }
-}
 
-private val ANDROID_COLUMN_NAME_PATTERN = Regex("[A-Za-z_][A-Za-z0-9_]*")
-
-private fun requireAndroidColumnName(identifier: String, label: String) {
-    require(ANDROID_COLUMN_NAME_PATTERN.matches(identifier)) {
-        "$label must be a simple Android contract column name."
-    }
-}
-
-private fun buildInSelection(attribute: String, values: List<Any?>): Pair<String, List<String>> {
-    val nonNullValues = values.filterNotNull()
-    val hasNull = values.any { it == null }
-
-    return when {
-        nonNullValues.isEmpty() && hasNull -> compiledSelection("($attribute IS NULL)", emptyList())
-        hasNull -> compiledSelection(
-            "(($attribute IN (${nonNullValues.joinToString(",") { "?" }})) OR ($attribute IS NULL))",
-            nonNullValues.map { it.toSqlArg() },
-        )
-
-        else -> compiledSelection(
-            "($attribute IN (${nonNullValues.joinToString(",") { "?" }}))",
-            nonNullValues.map { it.toSqlArg() },
-        )
-    }
-}
-
-private fun buildNotInSelection(attribute: String, values: List<Any?>): Pair<String, List<String>> {
-    val nonNullValues = values.filterNotNull()
-    val hasNull = values.any { it == null }
-
-    return when {
-        nonNullValues.isEmpty() && hasNull -> compiledSelection("($attribute IS NOT NULL)", emptyList())
-        hasNull -> compiledSelection(
-            "(($attribute NOT IN (${nonNullValues.joinToString(",") { "?" }})) AND ($attribute IS NOT NULL))",
-            nonNullValues.map { it.toSqlArg() },
-        )
-
-        else -> compiledSelection(
-            "($attribute NOT IN (${nonNullValues.joinToString(",") { "?" }}))",
-            nonNullValues.map { it.toSqlArg() },
-        )
-    }
-}
-
-private fun compiledSelection(selection: String, args: List<String>): Pair<String, List<String>> {
-    return selection to args
-}
-
-private fun Any?.toSqlArg(): String {
-    return when (this) {
-        null -> "null"
-        is Boolean -> if (this) "1" else "0"
-        else -> toString()
-    }
+    private class QuerySpec(
+        val projectionColumnsValue: List<String>? = null,
+        val sortClauseValue: String? = null,
+        val limitCountValue: Int? = null,
+        val offsetCountValue: Int? = null,
+        val selectionPartValue: Pair<String, List<String>>? = null,
+        val rawSelectionPartValue: Pair<String, List<String>>? = null,
+        val description: String,
+    ) : Query()
 }

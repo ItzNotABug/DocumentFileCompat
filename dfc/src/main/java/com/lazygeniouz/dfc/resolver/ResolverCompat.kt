@@ -125,21 +125,21 @@ internal object ResolverCompat {
         file: DocumentFileCompat,
         projection: Array<String> = fullProjection,
     ): List<DocumentFileCompat> {
-        return queryFiles(context, file, Query.select(*projection))
+        return listFiles(context, file, Query.select(*projection))
     }
 
     /**
      * Queries the ContentResolver using provider-level query arguments and builds
      * a list of [DocumentFileCompat].
      */
-    internal fun queryFiles(
+    internal fun listFiles(
         context: Context,
         file: DocumentFileCompat,
         vararg queries: Query,
     ): List<DocumentFileCompat> {
         val uri = file.uri
         val childrenUri = createChildrenUri(uri)
-        val projectionQueries = queries.mapNotNull { it.projectionColumns() }
+        val projectionQueries = queries.mapNotNull { query -> Query.projectionColumns(query) }
         val projection = LinkedHashSet<String>().apply {
             // Required internally to build child Uris and preserve child document behavior.
             add(Document.COLUMN_DOCUMENT_ID)
@@ -161,29 +161,29 @@ internal object ResolverCompat {
         var offset: Int? = null
 
         queries.forEach { query ->
-            if (query.projectionColumns() != null) return@forEach
+            if (Query.projectionColumns(query) != null) return@forEach
 
-            val sortClause = query.sortClause()
+            val sortClause = Query.sortClause(query)
             if (sortClause != null) {
                 sortClauses += sortClause
                 return@forEach
             }
 
-            val limitCount = query.limitCount()
+            val limitCount = Query.limitCount(query)
             if (limitCount != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) limit = limitCount
                 else ignoredQueries += query
                 return@forEach
             }
 
-            val offsetCount = query.offsetCount()
+            val offsetCount = Query.offsetCount(query)
             if (offsetCount != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) offset = offsetCount
                 else ignoredQueries += query
                 return@forEach
             }
 
-            val selectionPart = query.selectionPart()
+            val selectionPart = Query.selectionPart(query)
             if (selectionPart != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     selectionParts += selectionPart.first
@@ -194,7 +194,7 @@ internal object ResolverCompat {
                 return@forEach
             }
 
-            val rawSelectionPart = query.rawSelectionPart()
+            val rawSelectionPart = Query.rawSelectionPart(query)
             if (rawSelectionPart != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     selectionParts += rawSelectionPart.first
@@ -296,7 +296,7 @@ internal object ResolverCompat {
                 append("Ignored unsupported queries on API ")
                 append(Build.VERSION.SDK_INT)
                 append(": ")
-                append(ignoredQueries.joinToString { it.describe() })
+                append(ignoredQueries.joinToString { Query.describe(it) })
                 append(". SAF child-document filtering, limit, and offset require API 26+.")
             }
         )

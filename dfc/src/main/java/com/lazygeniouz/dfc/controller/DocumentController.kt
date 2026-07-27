@@ -46,7 +46,7 @@ internal class DocumentController(
     internal fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
         return if (!isDirectory()) {
             throw UnsupportedOperationException("Selected document is not a Directory.")
-        } else ResolverCompat.queryFiles(context, fileCompat, *queries)
+        } else ResolverCompat.listFiles(context, fileCompat, *queries)
     }
 
     /**
