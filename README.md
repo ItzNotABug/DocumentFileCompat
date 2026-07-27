@@ -98,6 +98,16 @@ are forwarded. On API 26+, filters, `Query.limit(...)`, `Query.offset(...)`, and
 Providers may still ignore supported query arguments. `DocumentFileCompat` forwards them, but the
 underlying provider decides what actually gets honored.
 
+Some quick tips:
+
+- Use `Query.select(...)` to fetch only the columns you need.
+- Use `Query.limit(...)` for previews, search results, and paged lists.
+- Prefer exact filters like `filesOnly()`, `mimeType(...)`, and `nameEquals(...)` over broad
+  `nameContains(...)` queries.
+- Avoid repeated `listFiles(...)` calls for the same directory; reuse the returned list when you
+  can.
+- Treat queries as fast-path provider hints, not guaranteed filtering across every provider.
+
 ## Performance
 
 The sample app includes simple comparisons against AndroidX `DocumentFile`. Results depend on the
