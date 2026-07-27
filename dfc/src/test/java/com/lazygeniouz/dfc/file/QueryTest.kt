@@ -264,6 +264,11 @@ class QueryTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
+    fun `select rejects unsafe column name`() {
+        Query.select("${Document.COLUMN_DISPLAY_NAME}; DROP TABLE documents")
+    }
+
+    @Test(expected = IllegalArgumentException::class)
     fun `selection rejects unsafe attribute name`() {
         Query.equal("${Document.COLUMN_DISPLAY_NAME}) OR 1=1 --", "report.pdf")
     }

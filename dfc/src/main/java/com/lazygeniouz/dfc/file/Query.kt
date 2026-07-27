@@ -28,6 +28,7 @@ sealed class Query private constructor() {
          */
         @JvmStatic
         fun select(vararg columns: String): Query {
+            columns.forEach { column -> requireAndroidColumnName(column, "column") }
             return QuerySpec(
                 projectionColumnsValue = columns.toList(),
                 description = "select",
