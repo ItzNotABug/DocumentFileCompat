@@ -254,6 +254,11 @@ class QueryTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
+    fun `select rejects empty columns`() {
+        Query.select()
+    }
+
+    @Test(expected = IllegalArgumentException::class)
     fun `rawSelection rejects blank selection`() {
         Query.rawSelection("   ")
     }

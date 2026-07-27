@@ -96,11 +96,16 @@ internal object ResolverCompat {
      */
     internal fun count(context: Context, uri: Uri): Int {
         val childrenUri = createChildrenUri(uri)
-        return getCursor(
-            context,
-            childrenUri,
-            iconProjection
-        )?.use { cursor -> return cursor.count } ?: 0
+        return try {
+            getCursor(
+                context,
+                childrenUri,
+                iconProjection
+            )?.use { cursor -> cursor.count } ?: 0
+        } catch (exception: Exception) {
+            ErrorLogger.logError("Exception while counting child documents", exception)
+            0
+        }
     }
 
     /**
@@ -310,75 +315,80 @@ internal object ResolverCompat {
     ): List<DocumentFileCompat> {
         val listOfDocuments = arrayListOf<DocumentFileCompat>()
 
-        cursor.use {
-            val itemCount = cursor.count
-            /**
-             * Pre-sizing the list to avoid resizing overhead.
-             * This is especially beneficial for directories with a large number of files.
-             *
-             * Memory comparison for 8192 files:
-             * 1. With pre-sizing: 3.10 MB
-             * 2. Without pre-sizing: 9.60 MB
-             */
-            if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
-
-            val idIndex = cursor.getColumnIndex(Document.COLUMN_DOCUMENT_ID)
-            if (idIndex == -1) {
-                ErrorLogger.logWarning(
-                    "Missing ${Document.COLUMN_DOCUMENT_ID} column in child document cursor."
-                )
-                return emptyList()
-            }
-
-            val nameIndex = cursor.getColumnIndex(Document.COLUMN_DISPLAY_NAME)
-            val sizeIndex = cursor.getColumnIndex(Document.COLUMN_SIZE)
-            val modifiedIndex = cursor.getColumnIndex(Document.COLUMN_LAST_MODIFIED)
-            val mimeIndex = cursor.getColumnIndex(Document.COLUMN_MIME_TYPE)
-            if (mimeIndex == -1) {
-                ErrorLogger.logWarning(
-                    "Missing ${Document.COLUMN_MIME_TYPE} column in child document cursor."
-                )
-                return emptyList()
-            }
-
-            val flagsIndex = cursor.getColumnIndex(Document.COLUMN_FLAGS)
-
-            while (cursor.moveToNext()) {
-                val documentId = cursor.getString(idIndex) ?: continue
-                val documentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
-
-                val documentName = getStringOrDefault(cursor, nameIndex)
-                val documentSize = getLongOrDefault(cursor, sizeIndex)
-                val lastModifiedTime = getLongOrDefault(cursor, modifiedIndex, -1L)
-                val documentMimeType = cursor.getString(mimeIndex) ?: continue
-
+        return try {
+            cursor.use {
+                val itemCount = cursor.count
                 /**
-                 * Default flags to 0 (no capabilities) when not included.
-                 * Using `-1` here would make bitwise checks behave as "all flags set".
+                 * Pre-sizing the list to avoid resizing overhead.
+                 * This is especially beneficial for directories with a large number of files.
+                 *
+                 * Memory comparison for 8192 files:
+                 * 1. With pre-sizing: 3.10 MB
+                 * 2. Without pre-sizing: 9.60 MB
                  */
-                val documentFlags = getLongOrDefault(cursor, flagsIndex, 0L).toInt()
+                if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
 
-                /* return correct document type */
-                val childFile: DocumentFileCompat =
-                    if (documentMimeType == Document.MIME_TYPE_DIR) {
-                        TreeDocumentFileCompat(
-                            context, documentUri, documentName,
-                            documentSize, lastModifiedTime,
-                            documentMimeType, documentFlags
-                        )
-                    } else {
-                        SingleDocumentFileCompat(
-                            context, documentUri, documentName,
-                            documentSize, lastModifiedTime,
-                            documentMimeType, documentFlags
-                        )
-                    }
-                childFile.parentFile = file
-                listOfDocuments.add(childFile)
+                val idIndex = cursor.getColumnIndex(Document.COLUMN_DOCUMENT_ID)
+                if (idIndex == -1) {
+                    ErrorLogger.logWarning(
+                        "Missing ${Document.COLUMN_DOCUMENT_ID} column in child document cursor."
+                    )
+                    return emptyList()
+                }
+
+                val nameIndex = cursor.getColumnIndex(Document.COLUMN_DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(Document.COLUMN_SIZE)
+                val modifiedIndex = cursor.getColumnIndex(Document.COLUMN_LAST_MODIFIED)
+                val mimeIndex = cursor.getColumnIndex(Document.COLUMN_MIME_TYPE)
+                if (mimeIndex == -1) {
+                    ErrorLogger.logWarning(
+                        "Missing ${Document.COLUMN_MIME_TYPE} column in child document cursor."
+                    )
+                    return emptyList()
+                }
+
+                val flagsIndex = cursor.getColumnIndex(Document.COLUMN_FLAGS)
+
+                while (cursor.moveToNext()) {
+                    val documentId = cursor.getString(idIndex) ?: continue
+                    val documentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+
+                    val documentName = getStringOrDefault(cursor, nameIndex)
+                    val documentSize = getLongOrDefault(cursor, sizeIndex)
+                    val lastModifiedTime = getLongOrDefault(cursor, modifiedIndex, -1L)
+                    val documentMimeType = cursor.getString(mimeIndex) ?: continue
+
+                    /**
+                     * Default flags to 0 (no capabilities) when not included.
+                     * Using `-1` here would make bitwise checks behave as "all flags set".
+                     */
+                    val documentFlags = getLongOrDefault(cursor, flagsIndex, 0L).toInt()
+
+                    /* return correct document type */
+                    val childFile: DocumentFileCompat =
+                        if (documentMimeType == Document.MIME_TYPE_DIR) {
+                            TreeDocumentFileCompat(
+                                context, documentUri, documentName,
+                                documentSize, lastModifiedTime,
+                                documentMimeType, documentFlags
+                            )
+                        } else {
+                            SingleDocumentFileCompat(
+                                context, documentUri, documentName,
+                                documentSize, lastModifiedTime,
+                                documentMimeType, documentFlags
+                            )
+                        }
+                    childFile.parentFile = file
+                    listOfDocuments.add(childFile)
+                }
             }
-        }
 
-        return listOfDocuments
+            listOfDocuments
+        } catch (exception: Exception) {
+            ErrorLogger.logError("Exception while building child document list", exception)
+            emptyList()
+        }
     }
 
     // Make children uri for query.

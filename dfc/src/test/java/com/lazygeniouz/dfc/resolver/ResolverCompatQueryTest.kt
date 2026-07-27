@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ContentResolver
 import android.content.pm.ProviderInfo
 import android.database.Cursor
+import android.database.CursorWrapper
 import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Build
@@ -232,6 +233,38 @@ class ResolverCompatQueryTest {
     }
 
     @Test
+    fun `count returns zero when child cursor count throws`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+        provider.throwOnChildCursorCount = true
+
+        assertEquals(0, root.count())
+    }
+
+    @Test
+    fun `query returns empty list when child cursor iteration throws`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+        provider.throwOnChildCursorGetString = true
+
+        val children = root.listFiles(Query.select(Document.COLUMN_DISPLAY_NAME))
+
+        assertTrue(children.isEmpty())
+    }
+
+    @Test
     fun `query listFiles rejects non-directory tree documents`() {
         val context = RuntimeEnvironment.getApplication()
         val file = TreeDocumentFileCompat(
@@ -294,6 +327,10 @@ class ResolverCompatQueryTest {
 
         var omitMimeTypeColumn: Boolean = false
 
+        var throwOnChildCursorCount: Boolean = false
+
+        var throwOnChildCursorGetString: Boolean = false
+
         private val documents = listOf(
             TestDocument(
                 id = ROOT_ID,
@@ -338,7 +375,7 @@ class ResolverCompatQueryTest {
             lastLegacySelection = null
             lastLegacySelectionArgs = null
             lastLegacySortOrder = sortOrder
-            return cursorOf(projection, documents.filterNot { it.id == ROOT_ID })
+            return childCursorOf(projection, documents.filterNot { it.id == ROOT_ID })
         }
 
         override fun queryChildDocuments(
@@ -348,7 +385,7 @@ class ResolverCompatQueryTest {
         ): Cursor {
             lastChildProjection = projection?.copyProjection()
             lastQueryArgs = queryArgs?.let(::Bundle)
-            return cursorOf(projection, documents.filterNot { it.id == ROOT_ID })
+            return childCursorOf(projection, documents.filterNot { it.id == ROOT_ID })
         }
 
         override fun openDocument(
@@ -369,6 +406,29 @@ class ResolverCompatQueryTest {
             return MatrixCursor(columns.toTypedArray()).apply {
                 documents.forEach { document ->
                     addRow(columns.map { column -> document.valueFor(column) })
+                }
+            }
+        }
+
+        private fun childCursorOf(
+            projection: Array<out String>?,
+            documents: List<TestDocument>,
+        ): Cursor {
+            val cursor = cursorOf(projection, documents)
+            if (!throwOnChildCursorCount && !throwOnChildCursorGetString) return cursor
+
+            return object : CursorWrapper(cursor) {
+
+                override fun getCount(): Int {
+                    if (throwOnChildCursorCount) throw IllegalStateException("count failed")
+                    return super.getCount()
+                }
+
+                override fun getString(columnIndex: Int): String? {
+                    if (throwOnChildCursorGetString) {
+                        throw IllegalStateException("getString failed")
+                    }
+                    return super.getString(columnIndex)
                 }
             }
         }
