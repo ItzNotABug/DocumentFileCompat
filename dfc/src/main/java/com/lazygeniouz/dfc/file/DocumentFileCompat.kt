@@ -284,11 +284,16 @@ abstract class DocumentFileCompat(
                 cursor.use {
                     if (!it.moveToFirst()) return@use null
 
-                    val documentName: String = it.getString(1)
-                    val documentSize: Long = it.getLong(2)
-                    val documentLastModified: Long = it.getLong(3)
-                    val documentMimeType: String = it.getString(4)
-                    val documentFlags: Int = it.getLong(5).toInt()
+                    val documentName: String =
+                        it.getString(it.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME))
+                    val documentSize: Long =
+                        it.getLong(it.getColumnIndexOrThrow(Document.COLUMN_SIZE))
+                    val documentLastModified: Long =
+                        it.getLong(it.getColumnIndexOrThrow(Document.COLUMN_LAST_MODIFIED))
+                    val documentMimeType: String =
+                        it.getString(it.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE))
+                    val documentFlags: Int =
+                        it.getLong(it.getColumnIndexOrThrow(Document.COLUMN_FLAGS)).toInt()
 
                     buildFile(
                         documentName,
