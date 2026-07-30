@@ -31,6 +31,11 @@ sealed class Query private constructor() {
         fun select(vararg columns: String): Query {
             require(columns.isNotEmpty()) { "select requires at least one column" }
             columns.forEach { column -> requireAndroidColumnName(column, "column") }
+            return projection(*columns)
+        }
+
+        @JvmSynthetic
+        internal fun projection(vararg columns: String): Query {
             return QuerySpec(
                 projectionColumnsValue = columns.toList(),
                 description = "select",

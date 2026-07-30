@@ -133,7 +133,7 @@ internal object ResolverCompat {
         projection: Array<String> = fullProjection,
     ): List<DocumentFileCompat> {
         val effectiveProjection = projection.ifEmpty { fullProjection }
-        return listFiles(context, file, Query.select(*effectiveProjection))
+        return listFiles(context, file, Query.projection(*effectiveProjection))
     }
 
     /**
@@ -158,6 +158,9 @@ internal object ResolverCompat {
             } else {
                 projectionQueries.forEach { addAll(it) }
             }
+
+            // Required internally for capability checks like canWrite() and isVirtual().
+            add(Document.COLUMN_FLAGS)
         }.toTypedArray()
 
         val ignoredQueries = mutableListOf<Query>()

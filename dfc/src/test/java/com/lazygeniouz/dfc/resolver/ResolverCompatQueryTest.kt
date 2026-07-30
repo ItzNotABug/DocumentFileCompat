@@ -81,6 +81,7 @@ class ResolverCompatQueryTest {
                 Document.COLUMN_DOCUMENT_ID,
                 Document.COLUMN_MIME_TYPE,
                 Document.COLUMN_DISPLAY_NAME,
+                Document.COLUMN_FLAGS,
             ),
             provider.lastChildProjection?.toList(),
         )
@@ -116,6 +117,7 @@ class ResolverCompatQueryTest {
                 Document.COLUMN_DOCUMENT_ID,
                 Document.COLUMN_MIME_TYPE,
                 Document.COLUMN_DISPLAY_NAME,
+                Document.COLUMN_FLAGS,
             ),
             provider.lastChildProjection?.toList(),
         )
@@ -126,11 +128,13 @@ class ResolverCompatQueryTest {
         assertTrue(file.isFile())
         assertFalse(file.isDirectory())
         assertEquals("text/plain", file.getType())
+        assertEquals(Document.FLAG_SUPPORTS_WRITE, file.documentFlags)
         assertSame(root, file.parentFile)
 
         assertTrue(directory.isDirectory())
         assertFalse(directory.isFile())
         assertNull(directory.getType())
+        assertEquals(Document.FLAG_DIR_SUPPORTS_CREATE, directory.documentFlags)
         assertSame(root, directory.parentFile)
     }
 
@@ -158,6 +162,7 @@ class ResolverCompatQueryTest {
                 Document.COLUMN_DOCUMENT_ID,
                 Document.COLUMN_MIME_TYPE,
                 Document.COLUMN_DISPLAY_NAME,
+                Document.COLUMN_FLAGS,
             ),
             provider.lastChildProjection?.toList(),
         )
@@ -167,6 +172,32 @@ class ResolverCompatQueryTest {
         assertEquals(
             "${Document.COLUMN_DISPLAY_NAME} DESC",
             provider.lastLegacySortOrder,
+        )
+        assertEquals(2, children.size)
+    }
+
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.M])
+    fun `legacy projection listFiles accepts provider specific columns`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        val children = root.listFiles(arrayOf("vendor.custom-column"))
+
+        assertEquals(
+            listOf(
+                Document.COLUMN_DOCUMENT_ID,
+                Document.COLUMN_MIME_TYPE,
+                "vendor.custom-column",
+                Document.COLUMN_FLAGS,
+            ),
+            provider.lastChildProjection?.toList(),
         )
         assertEquals(2, children.size)
     }

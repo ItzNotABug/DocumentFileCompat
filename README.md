@@ -100,7 +100,8 @@ underlying provider decides what actually gets honored.
 
 Some quick tips:
 
-- Use `Query.select(...)` to fetch only the columns you need.
+- Use `Query.select(...)` to narrow fetched metadata. `DocumentFileCompat` still adds the
+  internal columns it needs for child Uris, document types, and capability checks.
 - Use `Query.limit(...)` for previews, search results, and paged lists.
 - Prefer exact filters like `filesOnly()`, `mimeType(...)`, and `nameEquals(...)` over broad
   `nameContains(...)` queries.
