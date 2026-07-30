@@ -38,6 +38,7 @@ class DocumentFileCompatMakeTest {
         assertEquals(128L, file.length)
         assertEquals(7L, file.lastModified)
         assertEquals("text/plain", file.getType())
+        assertEquals(Document.FLAG_SUPPORTS_WRITE, file.documentFlags)
     }
 
     @Test
