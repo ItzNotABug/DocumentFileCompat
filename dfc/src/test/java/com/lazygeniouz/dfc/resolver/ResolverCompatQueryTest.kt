@@ -139,6 +139,54 @@ class ResolverCompatQueryTest {
     }
 
     @Test
+    fun `query forwards api 26 sort order bundle argument`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        root.listFiles(
+            Query.select(Document.COLUMN_DISPLAY_NAME),
+            Query.orderByAsc(Document.COLUMN_DISPLAY_NAME),
+        )
+
+        assertEquals(
+            "${Document.COLUMN_DISPLAY_NAME} ASC",
+            provider.lastQueryArgs?.getString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER),
+        )
+    }
+
+    @Test
+    fun `query joins api 26 filter bundle arguments with and`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        root.listFiles(
+            Query.filesOnly(),
+            Query.sizeGreaterThan(0L),
+        )
+
+        assertEquals(
+            "(${Document.COLUMN_MIME_TYPE} != ?) AND (${Document.COLUMN_SIZE} > ?)",
+            provider.lastQueryArgs?.getString(ContentResolver.QUERY_ARG_SQL_SELECTION),
+        )
+        assertArrayEquals(
+            arrayOf(Document.MIME_TYPE_DIR, "0"),
+            provider.lastQueryArgs?.getStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS),
+        )
+    }
+
+    @Test
     @Config(sdk = [Build.VERSION_CODES.M])
     fun `query falls back to legacy sort only before api 26`() {
         val context = RuntimeEnvironment.getApplication()
