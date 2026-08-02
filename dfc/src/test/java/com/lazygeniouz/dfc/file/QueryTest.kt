@@ -163,6 +163,62 @@ class QueryTest {
     }
 
     @Test
+    fun `allOf compiles grouped and selection`() {
+        val selectionPart = Query.allOf(
+            Query.filesOnly(),
+            Query.sizeGreaterThan(0L),
+        ).selectionPart()!!
+
+        assertEquals(
+            "((${Document.COLUMN_MIME_TYPE} != ?) AND (${Document.COLUMN_SIZE} > ?))",
+            selectionPart.first,
+        )
+        assertEquals(listOf(Document.MIME_TYPE_DIR, "0"), selectionPart.second)
+    }
+
+    @Test
+    fun `anyOf compiles grouped or selection`() {
+        val selectionPart = Query.anyOf(
+            Query.mimeType("image/png"),
+            Query.nameContains("report"),
+        ).selectionPart()!!
+
+        assertEquals(
+            "((${Document.COLUMN_MIME_TYPE} = ?) OR " +
+                "(${Document.COLUMN_DISPLAY_NAME} LIKE ? ESCAPE '\\'))",
+            selectionPart.first,
+        )
+        assertEquals(listOf("image/png", "%report%"), selectionPart.second)
+    }
+
+    @Test
+    fun `not compiles grouped negation selection`() {
+        val selectionPart = Query.not(Query.directoriesOnly()).selectionPart()!!
+
+        assertEquals("(NOT (${Document.COLUMN_MIME_TYPE} = ?))", selectionPart.first)
+        assertEquals(listOf(Document.MIME_TYPE_DIR), selectionPart.second)
+    }
+
+    @Test
+    fun `grouped filters can nest`() {
+        val selectionPart = Query.allOf(
+            Query.anyOf(
+                Query.nameEquals("a.txt"),
+                Query.nameEquals("b.txt"),
+            ),
+            Query.not(Query.directoriesOnly()),
+        ).selectionPart()!!
+
+        assertEquals(
+            "(((${Document.COLUMN_DISPLAY_NAME} = ?) OR " +
+                "(${Document.COLUMN_DISPLAY_NAME} = ?)) AND " +
+                "(NOT (${Document.COLUMN_MIME_TYPE} = ?)))",
+            selectionPart.first,
+        )
+        assertEquals(listOf("a.txt", "b.txt", Document.MIME_TYPE_DIR), selectionPart.second)
+    }
+
+    @Test
     fun `filesOnly maps to mime type not equal directory`() {
         val selectionPart = Query.filesOnly().selectionPart()!!
 
@@ -261,6 +317,31 @@ class QueryTest {
     @Test(expected = IllegalArgumentException::class)
     fun `select rejects empty columns`() {
         Query.select()
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `allOf rejects empty filters`() {
+        Query.allOf()
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `anyOf rejects empty filters`() {
+        Query.anyOf()
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `allOf rejects non filter query`() {
+        Query.allOf(Query.select(Document.COLUMN_DISPLAY_NAME))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `anyOf rejects non filter query`() {
+        Query.anyOf(Query.orderByAsc(Document.COLUMN_DISPLAY_NAME))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `not rejects non filter query`() {
+        Query.not(Query.limit(1))
     }
 
     @Test(expected = IllegalArgumentException::class)

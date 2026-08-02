@@ -19,10 +19,13 @@ public class DocumentFileCompatJavaApiTest {
             Query.orderByDesc(Document.COLUMN_LAST_MODIFIED),
             Query.in(Document.COLUMN_MIME_TYPE, "image/png", "image/jpeg"),
             Query.notIn(Document.COLUMN_MIME_TYPE, "application/pdf"),
+            Query.anyOf(Query.mimeType("image/png"), Query.mimeType("image/jpeg")),
+            Query.allOf(Query.filesOnly(), Query.sizeGreaterThan(0L)),
+            Query.not(Query.directoriesOnly()),
             Query.limit(100),
         };
 
-        assertEquals(5, queries.length);
+        assertEquals(8, queries.length);
     }
 
     @SuppressWarnings("unused")

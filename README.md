@@ -100,6 +100,7 @@ Some quick tips:
 
 - Use `Query.select(...)` to narrow fetched metadata. `DocumentFileCompat` still adds the
   internal columns it needs for child Uris, document types, and capability checks.
+- Use `Query.anyOf(...)`, `Query.allOf(...)`, and `Query.not(...)` for grouped filter logic.
 - Use `Query.limit(...)` for previews, search results, and paged lists.
 - Prefer exact filters like `filesOnly()`, `mimeType(...)`, and `nameEquals(...)` over broad
   `nameContains(...)` queries.

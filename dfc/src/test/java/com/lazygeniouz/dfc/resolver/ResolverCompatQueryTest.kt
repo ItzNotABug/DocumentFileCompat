@@ -187,6 +187,65 @@ class ResolverCompatQueryTest {
     }
 
     @Test
+    fun `query forwards grouped allOf filter bundle arguments`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        root.listFiles(
+            Query.allOf(
+                Query.filesOnly(),
+                Query.sizeGreaterThan(0L),
+            ),
+        )
+
+        assertEquals(
+            "((${Document.COLUMN_MIME_TYPE} != ?) AND (${Document.COLUMN_SIZE} > ?))",
+            provider.lastQueryArgs?.getString(ContentResolver.QUERY_ARG_SQL_SELECTION),
+        )
+        assertArrayEquals(
+            arrayOf(Document.MIME_TYPE_DIR, "0"),
+            provider.lastQueryArgs?.getStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS),
+        )
+    }
+
+    @Test
+    fun `query forwards grouped anyOf and not filter bundle arguments`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        root.listFiles(
+            Query.anyOf(
+                Query.mimeType("image/png"),
+                Query.nameContains("report"),
+            ),
+            Query.not(Query.directoriesOnly()),
+        )
+
+        assertEquals(
+            "((${Document.COLUMN_MIME_TYPE} = ?) OR " +
+                "(${Document.COLUMN_DISPLAY_NAME} LIKE ? ESCAPE '\\')) AND " +
+                "(NOT (${Document.COLUMN_MIME_TYPE} = ?))",
+            provider.lastQueryArgs?.getString(ContentResolver.QUERY_ARG_SQL_SELECTION),
+        )
+        assertArrayEquals(
+            arrayOf("image/png", "%report%", Document.MIME_TYPE_DIR),
+            provider.lastQueryArgs?.getStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS),
+        )
+    }
+
+    @Test
     @Config(sdk = [Build.VERSION_CODES.M])
     fun `query falls back to legacy sort only before api 26`() {
         val context = RuntimeEnvironment.getApplication()

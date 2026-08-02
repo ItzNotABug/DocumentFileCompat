@@ -16,7 +16,8 @@ import android.provider.DocumentsContract.Document
  * When multiple queries are passed to the same `listFiles(...)` call:
  *
  * - [Query.select] clauses are unioned.
- * - filter clauses are joined with AND.
+ * - top-level filter clauses are joined with AND. Use [Query.anyOf], [Query.allOf], and
+ *   [Query.not] for grouped filter logic.
  * - [Query.orderByAsc] and [Query.orderByDesc] clauses are applied in the order passed.
  * - repeated [Query.limit] or [Query.offset] clauses use the last value passed.
  */
@@ -296,6 +297,54 @@ class Query private constructor(
         }
 
         /**
+         * Match documents that satisfy every [filter].
+         *
+         * Only filter queries can be nested. Projection, sort, limit, and offset queries are
+         * not accepted.
+         *
+         * Forwarded on API 26+.
+         */
+        @JvmStatic
+        fun allOf(vararg filters: Query): Query {
+            return combineFilters("allOf", "AND", filters)
+        }
+
+        /**
+         * Match documents that satisfy at least one [filter].
+         *
+         * Only filter queries can be nested. Projection, sort, limit, and offset queries are
+         * not accepted.
+         *
+         * Forwarded on API 26+.
+         */
+        @JvmStatic
+        fun anyOf(vararg filters: Query): Query {
+            return combineFilters("anyOf", "OR", filters)
+        }
+
+        /**
+         * Match documents that do not satisfy [filter].
+         *
+         * Only filter queries can be nested. Projection, sort, limit, and offset queries are
+         * not accepted.
+         *
+         * Forwarded on API 26+.
+         */
+        @JvmStatic
+        fun not(filter: Query): Query {
+            val selectionPart = requireFilterQuery(filter, "not")
+            return Query(
+                Spec(
+                    selectionPart = compiledSelection(
+                        "(NOT ${selectionPart.first})",
+                        selectionPart.second,
+                    ),
+                    description = "not(${describe(filter)})",
+                ),
+            )
+        }
+
+        /**
          * Exclude directories.
          *
          * Forwarded on API 26+.
@@ -521,6 +570,41 @@ class Query private constructor(
                     nonNullValues.map { it.toSqlArg() },
                 )
             }
+        }
+
+        private fun combineFilters(
+            description: String,
+            operator: String,
+            filters: Array<out Query>,
+        ): Query {
+            require(filters.isNotEmpty()) { "$description requires at least one filter" }
+
+            val selectionParts = filters.map { filter ->
+                requireFilterQuery(filter, description)
+            }
+            val filterDescription = filters.joinToString { filter -> describe(filter) }
+            return Query(
+                Spec(
+                    selectionPart = compiledSelection(
+                        selectionParts.joinToString(
+                            separator = " $operator ",
+                            prefix = "(",
+                            postfix = ")",
+                        ) { selectionPart -> selectionPart.first },
+                        selectionParts.flatMap { selectionPart -> selectionPart.second },
+                    ),
+                    description = "$description($filterDescription)",
+                ),
+            )
+        }
+
+        private fun requireFilterQuery(
+            query: Query,
+            parentDescription: String,
+        ): Pair<String, List<String>> {
+            return query.spec.selectionPart ?: throw IllegalArgumentException(
+                "$parentDescription accepts only filter queries."
+            )
         }
 
         private fun compiledSelection(
