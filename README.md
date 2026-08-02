@@ -21,8 +21,7 @@ do not keep paying for the same queries again and again.
 - Raw `File` access via `fromFile(...)`.
 - Common `DocumentFile`-style methods and getters.
 - Faster directory listing and metadata access.
-- Custom projections for lighter queries.
-- Query-based child listing for filtering, sorting, paging, and projection.
+- Query-based child listing for projection, filtering, sorting, and paging.
 - Convenience APIs like `count()`, `copyTo(destination)`, and `copyFrom(source)`.
 
 ## Installation
@@ -69,7 +68,7 @@ Other entry points:
 - `DocumentFileCompat.fromFile(context, file)`
 
 Additional helpers like `count()`, `copyTo(destination)`, `copyFrom(source)`,
-`listFiles(projection)`, and `listFiles(vararg queries)` are available when you need them.
+and `listFiles(vararg queries)` are available when you need them.
 
 ### Query Child Documents
 
@@ -92,8 +91,7 @@ val recentFiles = directory.listFiles(
 ```
 
 On API 21-25, only `Query.select(...)`, `Query.orderByAsc(...)`, and `Query.orderByDesc(...)`
-are forwarded. On API 26+, filters, `Query.limit(...)`, `Query.offset(...)`, and
-`Query.rawSelection(...)` are also forwarded.
+are forwarded. On API 26+, filters, `Query.limit(...)`, and `Query.offset(...)` are also forwarded.
 
 Providers may still ignore supported query arguments. `DocumentFileCompat` forwards them, but the
 underlying provider decides what actually gets honored.

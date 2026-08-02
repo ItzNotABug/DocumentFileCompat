@@ -264,11 +264,6 @@ class QueryTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `rawSelection rejects blank selection`() {
-        Query.rawSelection("   ")
-    }
-
-    @Test(expected = IllegalArgumentException::class)
     fun `orderByAsc rejects unsafe column name`() {
         Query.orderByAsc("${Document.COLUMN_DISPLAY_NAME}; DROP TABLE documents")
     }
@@ -322,4 +317,11 @@ private fun Query.offsetCount(): Int? {
 
 private fun Query.selectionPart(): Pair<String, List<String>>? {
     return Query.selectionPart(this)
+}
+
+@Suppress("unused")
+private fun listFilesOverloadsAreCallableFromKotlinSource(file: DocumentFileCompat) {
+    file.listFiles()
+    file.listFiles(Query.select(Document.COLUMN_DISPLAY_NAME))
+    file.listFiles(Query.limit(1))
 }

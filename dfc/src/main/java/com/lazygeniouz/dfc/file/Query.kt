@@ -1,29 +1,44 @@
 package com.lazygeniouz.dfc.file
 
 import android.provider.DocumentsContract.Document
-import com.lazygeniouz.dfc.file.Query.Companion.limit
-import com.lazygeniouz.dfc.file.Query.Companion.offset
-import com.lazygeniouz.dfc.file.Query.Companion.orderByAsc
-import com.lazygeniouz.dfc.file.Query.Companion.orderByDesc
-import com.lazygeniouz.dfc.file.Query.Companion.rawSelection
 
 /**
  * Query clauses for [DocumentFileCompat.listFiles].
  *
  * For tree-backed SAF directories:
  *
- * - API 21-25: only [select], [orderByAsc], and [orderByDesc] are forwarded.
- * - API 26+: filter queries, [limit], [offset], and [rawSelection] are also forwarded.
+ * - API 21-25: only [Query.select], [Query.orderByAsc], and [Query.orderByDesc] are forwarded.
+ * - API 26+: filter queries, [Query.limit], and [Query.offset] are also forwarded.
  *
  * Unsupported clauses are ignored and logged. Providers may still ignore forwarded clauses.
- * Filter values must be null, String, Number, or Boolean.
+ * Filter values must be null, String, Number, or Boolean. Float and Double values must be finite.
+ *
+ * When multiple queries are passed to the same `listFiles(...)` call:
+ *
+ * - [Query.select] clauses are unioned.
+ * - filter clauses are joined with AND.
+ * - [Query.orderByAsc] and [Query.orderByDesc] clauses are applied in the order passed.
+ * - repeated [Query.limit] or [Query.offset] clauses use the last value passed.
  */
-sealed class Query private constructor() {
+class Query private constructor(
+    private val spec: Spec,
+) {
+
+    private class Spec(
+        val projectionColumns: List<String>? = null,
+        val sortClause: String? = null,
+        val limitCount: Int? = null,
+        val offsetCount: Int? = null,
+        val selectionPart: Pair<String, List<String>>? = null,
+        val description: String,
+    )
 
     companion object {
 
         /**
          * Fetch the given columns, plus columns required internally to build results.
+         *
+         * Use this when combining projection with sort, filter, limit, or offset query clauses.
          *
          * Forwarded on API 21+.
          */
@@ -36,9 +51,11 @@ sealed class Query private constructor() {
 
         @JvmSynthetic
         internal fun projection(vararg columns: String): Query {
-            return QuerySpec(
-                projectionColumnsValue = columns.toList(),
-                description = "select",
+            return Query(
+                Spec(
+                    projectionColumns = columns.toList(),
+                    description = "select",
+                ),
             )
         }
 
@@ -65,33 +82,43 @@ sealed class Query private constructor() {
         /**
          * Limit the number of returned child documents.
          *
+         * If more than one limit is passed to the same `listFiles(...)` call, the last one wins.
+         *
          * Forwarded on API 26+.
          */
         @JvmStatic
         fun limit(count: Int): Query {
             require(count >= 0) { "limit must be >= 0" }
-            return QuerySpec(
-                limitCountValue = count,
-                description = "limit($count)",
+            return Query(
+                Spec(
+                    limitCount = count,
+                    description = "limit($count)",
+                ),
             )
         }
 
         /**
          * Skip the first [count] child documents.
          *
+         * If more than one offset is passed to the same `listFiles(...)` call, the last one wins.
+         *
          * Forwarded on API 26+.
          */
         @JvmStatic
         fun offset(count: Int): Query {
             require(count >= 0) { "offset must be >= 0" }
-            return QuerySpec(
-                offsetCountValue = count,
-                description = "offset($count)",
+            return Query(
+                Spec(
+                    offsetCount = count,
+                    description = "offset($count)",
+                ),
             )
         }
 
         /**
          * Attribute equals [value].
+         *
+         * A null [value] is compiled as `IS NULL`.
          *
          * Forwarded on API 26+.
          */
@@ -106,6 +133,8 @@ sealed class Query private constructor() {
         /**
          * Attribute does not equal [value].
          *
+         * A null [value] is compiled as `IS NOT NULL`.
+         *
          * Forwarded on API 26+.
          */
         @JvmStatic
@@ -119,6 +148,8 @@ sealed class Query private constructor() {
         /**
          * Attribute equals one of [values].
          *
+         * Null values add an `IS NULL` branch.
+         *
          * Forwarded on API 26+.
          */
         @JvmStatic
@@ -131,6 +162,8 @@ sealed class Query private constructor() {
 
         /**
          * Attribute does not equal any of [values].
+         *
+         * Null values add an `IS NOT NULL` guard.
          *
          * Forwarded on API 26+.
          */
@@ -235,6 +268,9 @@ sealed class Query private constructor() {
         /**
          * Attribute matches the SQL LIKE [pattern].
          *
+         * The pattern is forwarded as-is. Escape literal `%`, `_`, and `\` yourself, or use
+         * [nameContains] for display-name contains matching.
+         *
          * Forwarded on API 26+.
          */
         @JvmStatic
@@ -247,6 +283,9 @@ sealed class Query private constructor() {
         /**
          * Attribute does not match the SQL LIKE [pattern].
          *
+         * The pattern is forwarded as-is. Escape literal `%`, `_`, and `\` yourself, or use
+         * [nameContains] for display-name contains matching.
+         *
          * Forwarded on API 26+.
          */
         @JvmStatic
@@ -254,24 +293,6 @@ sealed class Query private constructor() {
             return selection(attribute, "notLike($attribute)") { column ->
                 compiledSelection("($column NOT LIKE ? ESCAPE '\\')", listOf(pattern))
             }
-        }
-
-        /**
-         * Pass a raw SQL-style selection expression.
-         *
-         * The selection is grouped and forwarded as a SQL selection clause.
-         * Callers must keep column names trusted.
-         * Use this for provider-specific expressions or qualified column references.
-         *
-         * Forwarded on API 26+.
-         */
-        @JvmStatic
-        fun rawSelection(selection: String, vararg args: String): Query {
-            require(selection.isNotBlank()) { "selection must not be blank" }
-            return QuerySpec(
-                rawSelectionPartValue = compiledSelection("($selection)", args.toList()),
-                description = "rawSelection",
-            )
         }
 
         /**
@@ -306,6 +327,8 @@ sealed class Query private constructor() {
 
         /**
          * Name contains [value].
+         *
+         * SQL LIKE wildcards in [value] are escaped before forwarding.
          *
          * Forwarded on API 26+.
          */
@@ -379,48 +402,45 @@ sealed class Query private constructor() {
 
         @JvmSynthetic
         internal fun projectionColumns(query: Query): List<String>? {
-            return query.asSpec().projectionColumnsValue
+            return query.spec.projectionColumns
         }
 
         @JvmSynthetic
         internal fun sortClause(query: Query): String? {
-            return query.asSpec().sortClauseValue
+            return query.spec.sortClause
         }
 
         @JvmSynthetic
         internal fun limitCount(query: Query): Int? {
-            return query.asSpec().limitCountValue
+            return query.spec.limitCount
         }
 
         @JvmSynthetic
         internal fun offsetCount(query: Query): Int? {
-            return query.asSpec().offsetCountValue
+            return query.spec.offsetCount
         }
 
         @JvmSynthetic
         internal fun selectionPart(query: Query): Pair<String, List<String>>? {
-            return query.asSpec().selectionPartValue
-        }
-
-        @JvmSynthetic
-        internal fun rawSelectionPart(query: Query): Pair<String, List<String>>? {
-            return query.asSpec().rawSelectionPartValue
+            return query.spec.selectionPart
         }
 
         @JvmSynthetic
         internal fun describe(query: Query): String {
-            return query.asSpec().description
-        }
-
-        private fun Query.asSpec(): QuerySpec {
-            return this as QuerySpec
+            return query.spec.description
         }
 
         private fun sortQuery(column: String, descending: Boolean): Query {
             requireAndroidColumnName(column, "column")
-            return QuerySpec(
-                sortClauseValue = "$column ${if (descending) "DESC" else "ASC"}",
-                description = if (descending) "orderByDesc($column)" else "orderByAsc($column)",
+            return Query(
+                Spec(
+                    sortClause = "$column ${if (descending) "DESC" else "ASC"}",
+                    description = if (descending) {
+                        "orderByDesc($column)"
+                    } else {
+                        "orderByAsc($column)"
+                    },
+                ),
             )
         }
 
@@ -430,9 +450,11 @@ sealed class Query private constructor() {
             build: (String) -> Pair<String, List<String>>,
         ): Query {
             requireAndroidColumnName(attribute, "attribute")
-            return QuerySpec(
-                selectionPartValue = build(attribute),
-                description = description,
+            return Query(
+                Spec(
+                    selectionPart = build(attribute),
+                    description = description,
+                ),
             )
         }
 
@@ -540,14 +562,4 @@ sealed class Query private constructor() {
             }
         }
     }
-
-    private class QuerySpec(
-        val projectionColumnsValue: List<String>? = null,
-        val sortClauseValue: String? = null,
-        val limitCountValue: Int? = null,
-        val offsetCountValue: Int? = null,
-        val selectionPartValue: Pair<String, List<String>>? = null,
-        val rawSelectionPartValue: Pair<String, List<String>>? = null,
-        val description: String,
-    ) : Query()
 }

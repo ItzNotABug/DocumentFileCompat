@@ -225,60 +225,6 @@ class ResolverCompatQueryTest {
     }
 
     @Test
-    @Config(sdk = [Build.VERSION_CODES.M])
-    fun `legacy projection listFiles accepts provider specific columns`() {
-        val context = RuntimeEnvironment.getApplication()
-        val root = TreeDocumentFileCompat(
-            context = context,
-            documentUri = TestDocumentsProvider.rootDocumentUri(),
-            documentName = "root",
-            documentMimeType = Document.MIME_TYPE_DIR,
-            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
-        )
-
-        val children = root.listFiles(arrayOf("vendor.custom-column"))
-
-        assertEquals(
-            listOf(
-                Document.COLUMN_DOCUMENT_ID,
-                Document.COLUMN_MIME_TYPE,
-                "vendor.custom-column",
-                Document.COLUMN_FLAGS,
-            ),
-            provider.lastChildProjection?.toList(),
-        )
-        assertEquals(2, children.size)
-    }
-
-    @Test
-    @Config(sdk = [Build.VERSION_CODES.M])
-    fun `legacy projection listFiles accepts empty projection`() {
-        val context = RuntimeEnvironment.getApplication()
-        val root = TreeDocumentFileCompat(
-            context = context,
-            documentUri = TestDocumentsProvider.rootDocumentUri(),
-            documentName = "root",
-            documentMimeType = Document.MIME_TYPE_DIR,
-            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
-        )
-
-        val children = root.listFiles(emptyArray<String>())
-
-        assertEquals(
-            listOf(
-                Document.COLUMN_DOCUMENT_ID,
-                Document.COLUMN_MIME_TYPE,
-                Document.COLUMN_DISPLAY_NAME,
-                Document.COLUMN_SIZE,
-                Document.COLUMN_LAST_MODIFIED,
-                Document.COLUMN_FLAGS,
-            ),
-            provider.lastChildProjection?.toList(),
-        )
-        assertEquals(2, children.size)
-    }
-
-    @Test
     fun `query returns empty list when provider omits required document id column`() {
         val context = RuntimeEnvironment.getApplication()
         val root = TreeDocumentFileCompat(
@@ -319,7 +265,7 @@ class ResolverCompatQueryTest {
     }
 
     @Test
-    fun `query forwards raw selection and offset`() {
+    fun `query forwards offset`() {
         val context = RuntimeEnvironment.getApplication()
         val root = TreeDocumentFileCompat(
             context = context,
@@ -329,19 +275,8 @@ class ResolverCompatQueryTest {
             documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
         )
 
-        root.listFiles(
-            Query.rawSelection("${Document.COLUMN_DISPLAY_NAME} LIKE ?", "notes%"),
-            Query.offset(2),
-        )
+        root.listFiles(Query.offset(2))
 
-        assertEquals(
-            "(${Document.COLUMN_DISPLAY_NAME} LIKE ?)",
-            provider.lastQueryArgs?.getString(ContentResolver.QUERY_ARG_SQL_SELECTION),
-        )
-        assertArrayEquals(
-            arrayOf("notes%"),
-            provider.lastQueryArgs?.getStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS),
-        )
         assertEquals(2, provider.lastQueryArgs?.getInt(ContentResolver.QUERY_ARG_OFFSET))
     }
 

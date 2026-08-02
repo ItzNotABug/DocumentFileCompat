@@ -104,16 +104,6 @@ internal class RawDocumentFileCompat(context: Context, var file: File) :
     }
 
     /**
-     * Returns list of files using File API.
-     *
-     * [projection] is ignored here because it only affects provider column fetching,
-     * not which child files are returned.
-     */
-    override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
-        return listFiles()
-    }
-
-    /**
      * This will return the children count in the directory.
      *
      * [File] api is usually fast but may slow down if there are a lot of children in the directory..

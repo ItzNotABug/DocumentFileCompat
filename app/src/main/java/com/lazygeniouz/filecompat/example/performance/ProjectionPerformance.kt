@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.DocumentsContract.Document
 import androidx.documentfile.provider.DocumentFile
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.filecompat.example.performance.Performance.measureTimeSeconds
 
 object ProjectionPerformance {
@@ -57,7 +58,7 @@ object ProjectionPerformance {
                 Document.COLUMN_DOCUMENT_ID,
                 Document.COLUMN_DISPLAY_NAME
             )
-            val files = documentFile?.listFiles(minimalProjection)
+            val files = documentFile?.listFiles(Query.select(*minimalProjection))
             fileCount = files?.size ?: 0
 
             // Verify we can access the names
@@ -82,7 +83,7 @@ object ProjectionPerformance {
                 Document.COLUMN_DISPLAY_NAME,
                 Document.COLUMN_SIZE
             )
-            val files = documentFile?.listFiles(partialProjection)
+            val files = documentFile?.listFiles(Query.select(*partialProjection))
             fileCount = files?.size ?: 0
 
             // Calculate total size

@@ -1,6 +1,7 @@
 package com.lazygeniouz.dfc.file;
 
 import android.provider.DocumentsContract.Document;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import org.junit.Test;
@@ -27,7 +28,6 @@ public class DocumentFileCompatJavaApiTest {
     @SuppressWarnings("unused")
     private static void listFilesOverloadsAreCallableFromJavaSource(DocumentFileCompat file) {
         file.listFiles();
-        file.listFiles(new String[] { Document.COLUMN_DISPLAY_NAME });
         file.listFiles(Query.limit(1));
         file.listFiles(new Query[] { Query.limit(1), Query.filesOnly() });
     }
@@ -45,6 +45,12 @@ public class DocumentFileCompatJavaApiTest {
                     && Arrays.equals(method.getParameterTypes(), new Class<?>[] { Query[].class })
             )
         );
+        assertFalse(
+            Arrays.stream(methods).anyMatch(method ->
+                method.getName().equals("listFiles")
+                    && Arrays.equals(method.getParameterTypes(), new Class<?>[] { String[].class })
+            )
+        );
     }
 
     @Test
@@ -60,6 +66,20 @@ public class DocumentFileCompatJavaApiTest {
             Arrays.stream(methods).anyMatch(method ->
                 method.getName().equals("makeFromCursor") && !method.isSynthetic()
             )
+        );
+    }
+
+    @Test
+    public void queryInternalApiIsSyntheticOnJavaSide() {
+        Method[] methods = Query.Companion.getClass().getMethods();
+
+        assertTrue(
+            Arrays.stream(methods).anyMatch(method ->
+                method.getName().startsWith("projectionColumns") && method.isSynthetic()
+            )
+        );
+        assertTrue(
+            Arrays.stream(Query.class.getConstructors()).allMatch(Constructor::isSynthetic)
         );
     }
 }

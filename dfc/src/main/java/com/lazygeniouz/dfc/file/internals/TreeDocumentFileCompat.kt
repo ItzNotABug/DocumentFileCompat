@@ -51,13 +51,6 @@ internal class TreeDocumentFileCompat(
         return treeFileUri?.let { make(context, treeFileUri, false) }
     }
 
-    /**
-     * This will return a list of [DocumentFileCompat] with the required fields based on the passed [projection].
-     */
-    override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
-        return fileController.listFiles(projection)
-    }
-
     override fun listFiles(): List<DocumentFileCompat> {
         return fileController.listFiles()
     }

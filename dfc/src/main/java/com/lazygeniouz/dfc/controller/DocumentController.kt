@@ -32,12 +32,10 @@ internal class DocumentController(
     /**
      * This will return a list of [DocumentFileCompat] with all the defined fields.
      */
-    internal fun listFiles(
-        projection: Array<String> = ResolverCompat.fullProjection,
-    ): List<DocumentFileCompat> {
+    internal fun listFiles(): List<DocumentFileCompat> {
         return if (!isDirectory())
             throw UnsupportedOperationException("Selected document is not a Directory.")
-        else ResolverCompat.listFiles(context, fileCompat, projection)
+        else ResolverCompat.listFiles(context, fileCompat)
     }
 
     /**

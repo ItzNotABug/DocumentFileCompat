@@ -69,16 +69,12 @@ abstract class DocumentFileCompat(
     abstract fun listFiles(): List<DocumentFileCompat>
 
     /**
-     * Same as [listFiles] but allows specifying a custom [projection] (columns to query).
-     *
-     * Use custom projection to improve performance by fetching only needed data.
-     */
-    abstract fun listFiles(projection: Array<String>): List<DocumentFileCompat>
-
-    /**
      * List child documents using [Query] clauses.
      *
-     * This is only supported for tree-backed directories.
+     * This is only supported for tree-backed directories. File-backed documents do not evaluate
+     * provider-level query clauses locally.
+     *
+     * @throws UnsupportedOperationException if this document is not a tree-backed directory.
      */
     // Open instead of abstract so existing external subclasses keep source compatibility.
     open fun listFiles(vararg queries: Query): List<DocumentFileCompat> {

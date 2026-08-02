@@ -125,18 +125,6 @@ internal object ResolverCompat {
     }
 
     /**
-     * Queries the ContentResolver & builds a list of [DocumentFileCompat] with all the required fields.
-     */
-    internal fun listFiles(
-        context: Context,
-        file: DocumentFileCompat,
-        projection: Array<String> = fullProjection,
-    ): List<DocumentFileCompat> {
-        val effectiveProjection = projection.ifEmpty { fullProjection }
-        return listFiles(context, file, Query.projection(*effectiveProjection))
-    }
-
-    /**
      * Queries the ContentResolver using provider-level query arguments and builds
      * a list of [DocumentFileCompat].
      */
@@ -203,16 +191,6 @@ internal object ResolverCompat {
                     ignoredQueries += query
                 }
                 return@forEach
-            }
-
-            val rawSelectionPart = Query.rawSelectionPart(query)
-            if (rawSelectionPart != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    selectionParts += rawSelectionPart.first
-                    selectionArgs += rawSelectionPart.second
-                } else {
-                    ignoredQueries += query
-                }
             }
         }
 
