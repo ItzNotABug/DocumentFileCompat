@@ -76,12 +76,7 @@ abstract class DocumentFileCompat(
      *
      * @throws UnsupportedOperationException if this document is not a tree-backed directory.
      */
-    // Open instead of abstract so existing external subclasses keep source compatibility.
-    open fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
-        throw UnsupportedOperationException(
-            "Queries are only supported for DocumentsProvider-backed tree URIs."
-        )
-    }
+    abstract fun listFiles(vararg queries: Query): List<DocumentFileCompat>
 
     /**
      * This will return the children count inside a **Directory** without creating [DocumentFileCompat] objects.

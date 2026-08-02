@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 
 /**
@@ -48,6 +49,12 @@ internal class SingleDocumentFileCompat(
      */
     override fun listFiles(): List<DocumentFileCompat> {
         throw UnsupportedOperationException()
+    }
+
+    override fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
+        throw UnsupportedOperationException(
+            "Queries are only supported for DocumentsProvider-backed tree URIs."
+        )
     }
 
     /**

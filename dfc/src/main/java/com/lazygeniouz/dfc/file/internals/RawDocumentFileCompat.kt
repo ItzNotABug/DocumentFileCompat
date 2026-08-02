@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.dfc.logger.ErrorLogger.logError
 import java.io.File
 
@@ -101,6 +102,12 @@ internal class RawDocumentFileCompat(context: Context, var file: File) :
      */
     override fun listFiles(): List<DocumentFileCompat> {
         return file.listFiles()?.map { child -> fromFile(context, child) } ?: emptyList()
+    }
+
+    override fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
+        throw UnsupportedOperationException(
+            "Queries are only supported for DocumentsProvider-backed tree URIs."
+        )
     }
 
     /**
