@@ -2,6 +2,7 @@ package com.lazygeniouz.dfc.file
 
 import android.content.ContentResolver
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
@@ -9,6 +10,7 @@ import com.lazygeniouz.dfc.controller.DocumentController
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.logger.ErrorLogger
 import java.io.File
 
 /**
@@ -67,11 +69,14 @@ abstract class DocumentFileCompat(
     abstract fun listFiles(): List<DocumentFileCompat>
 
     /**
-     * Same as [listFiles] but allows specifying a custom [projection] (columns to query).
+     * List child documents using [Query] clauses.
      *
-     * Use custom projection to improve performance by fetching only needed data.
+     * This is only supported for tree-backed directories. File-backed documents do not evaluate
+     * provider-level query clauses locally.
+     *
+     * @throws UnsupportedOperationException if this document is not a tree-backed directory.
      */
-    abstract fun listFiles(projection: Array<String>): List<DocumentFileCompat>
+    abstract fun listFiles(vararg queries: Query): List<DocumentFileCompat>
 
     /**
      * This will return the children count inside a **Directory** without creating [DocumentFileCompat] objects.
@@ -252,6 +257,47 @@ abstract class DocumentFileCompat(
         internal fun isTreeUri(uri: Uri): Boolean {
             val paths = uri.pathSegments
             return paths.size >= 2 && "tree" == paths[0]
+        }
+
+        @JvmSynthetic
+        internal fun <T : DocumentFileCompat> fromCursor(
+            cursor: Cursor,
+            errorMessage: String,
+            buildFile: (
+                documentName: String,
+                documentSize: Long,
+                documentLastModified: Long,
+                documentMimeType: String,
+                documentFlags: Int,
+            ) -> T,
+        ): T? {
+            return try {
+                cursor.use {
+                    if (!it.moveToFirst()) return@use null
+
+                    val documentName: String =
+                        it.getString(it.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME))
+                    val documentSize: Long =
+                        it.getLong(it.getColumnIndexOrThrow(Document.COLUMN_SIZE))
+                    val documentLastModified: Long =
+                        it.getLong(it.getColumnIndexOrThrow(Document.COLUMN_LAST_MODIFIED))
+                    val documentMimeType: String =
+                        it.getString(it.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE))
+                    val documentFlags: Int =
+                        it.getLong(it.getColumnIndexOrThrow(Document.COLUMN_FLAGS)).toInt()
+
+                    buildFile(
+                        documentName,
+                        documentSize,
+                        documentLastModified,
+                        documentMimeType,
+                        documentFlags,
+                    )
+                }
+            } catch (exception: Exception) {
+                ErrorLogger.logError(errorMessage, exception)
+                null
+            }
         }
     }
 }

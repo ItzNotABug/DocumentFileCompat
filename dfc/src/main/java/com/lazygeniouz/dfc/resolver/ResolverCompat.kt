@@ -4,9 +4,12 @@ import android.content.ContentResolver
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
+import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import com.lazygeniouz.dfc.logger.ErrorLogger
@@ -93,11 +96,18 @@ internal object ResolverCompat {
      */
     internal fun count(context: Context, uri: Uri): Int {
         val childrenUri = createChildrenUri(uri)
-        return getCursor(
-            context,
-            childrenUri,
-            iconProjection
-        )?.use { cursor -> return cursor.count } ?: 0
+        val cursor = getCursor(context, childrenUri, iconProjection) ?: return 0
+        return count(cursor)
+    }
+
+    @JvmSynthetic
+    internal fun count(cursor: Cursor): Int {
+        return try {
+            cursor.use { it.count }
+        } catch (exception: Exception) {
+            ErrorLogger.logError("Exception while counting child documents", exception)
+            0
+        }
     }
 
     /**
@@ -115,101 +125,254 @@ internal object ResolverCompat {
     }
 
     /**
-     * Queries the ContentResolver & builds a list of [DocumentFileCompat] with all the required fields.
+     * Queries the ContentResolver using provider-level query arguments and builds
+     * a list of [DocumentFileCompat].
      */
     internal fun listFiles(
         context: Context,
         file: DocumentFileCompat,
-        projection: Array<String> = fullProjection,
+        vararg queries: Query,
     ): List<DocumentFileCompat> {
         val uri = file.uri
         val childrenUri = createChildrenUri(uri)
-        val listOfDocuments = arrayListOf<DocumentFileCompat>()
+        val projectionQueries = queries.mapNotNull { query -> Query.projectionColumns(query) }
+        val projection = LinkedHashSet<String>().apply {
+            // Required internally to build child Uris and preserve child document behavior.
+            add(Document.COLUMN_DOCUMENT_ID)
+            add(Document.COLUMN_MIME_TYPE)
 
-        val finalProjection = arrayOf(
-            Document.COLUMN_DOCUMENT_ID, /* identifier */
-            Document.COLUMN_MIME_TYPE, /* for supporting rename via `isDirectory` check */
-            *projection
-        ).distinct().toTypedArray()
+            if (projectionQueries.isEmpty()) {
+                addAll(fullProjection)
+            } else {
+                projectionQueries.forEach { addAll(it) }
+            }
 
-        val cursor = getCursor(context, childrenUri, finalProjection) ?: return emptyList()
+            // Required internally for capability checks like canWrite() and isVirtual().
+            add(Document.COLUMN_FLAGS)
+        }.toTypedArray()
 
-        cursor.use {
-            val itemCount = cursor.count
-            /**
-             * Pre-sizing the list to avoid resizing overhead.
-             * This is especially beneficial for directories with a large number of files.
-             *
-             * Memory comparison for 8192 files:
-             * 1. With pre-sizing: 3.10 MB
-             * 2. Without pre-sizing: 9.60 MB
-             */
-            if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
+        val ignoredQueries = mutableListOf<Query>()
+        val selectionParts = mutableListOf<String>()
+        val selectionArgs = mutableListOf<String>()
+        val sortClauses = mutableListOf<String>()
 
-            // Resolve column indices dynamically
-            val idIndex = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
+        var limit: Int? = null
+        var offset: Int? = null
 
-            val nameIndex = cursor.getColumnIndex(Document.COLUMN_DISPLAY_NAME)
-            val sizeIndex = cursor.getColumnIndex(Document.COLUMN_SIZE)
-            val modifiedIndex = cursor.getColumnIndex(Document.COLUMN_LAST_MODIFIED)
-            val mimeIndex = cursor.getColumnIndex(Document.COLUMN_MIME_TYPE)
-            val flagsIndex = cursor.getColumnIndex(Document.COLUMN_FLAGS)
+        queries.forEach { query ->
+            if (Query.projectionColumns(query) != null) return@forEach
 
-            while (cursor.moveToNext()) {
-                val documentId = cursor.getString(idIndex) ?: continue
-                val documentUri = DocumentsContract.buildDocumentUriUsingTree(uri, documentId)
+            val sortClause = Query.sortClause(query)
+            if (sortClause != null) {
+                sortClauses += sortClause
+                return@forEach
+            }
 
-                val documentName = getStringOrDefault(cursor, nameIndex)
-                val documentSize = getLongOrDefault(cursor, sizeIndex)
-                val lastModifiedTime = getLongOrDefault(cursor, modifiedIndex, -1L)
-                val documentMimeType = getStringOrDefault(cursor, mimeIndex)
+            val limitCount = Query.limitCount(query)
+            if (limitCount != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) limit = limitCount
+                else ignoredQueries += query
+                return@forEach
+            }
 
-                /**
-                 * Default flags to 0 (no capabilities) when not included.
-                 * Using `-1` here would make bitwise checks behave as "all flags set".
-                 */
-                val documentFlags = getLongOrDefault(cursor, flagsIndex, 0L).toInt()
+            val offsetCount = Query.offsetCount(query)
+            if (offsetCount != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) offset = offsetCount
+                else ignoredQueries += query
+                return@forEach
+            }
 
-                /* return correct document type */
-                val childFile: DocumentFileCompat =
-                    if (documentMimeType == Document.MIME_TYPE_DIR) {
-                        TreeDocumentFileCompat(
-                            context, documentUri, documentName,
-                            documentSize, lastModifiedTime,
-                            documentMimeType, documentFlags
-                        )
-                    } else {
-                        SingleDocumentFileCompat(
-                            context, documentUri, documentName,
-                            documentSize, lastModifiedTime,
-                            documentMimeType, documentFlags
-                        )
-                    }
-                childFile.parentFile = file
-                listOfDocuments.add(childFile)
+            val selectionPart = Query.selectionPart(query)
+            if (selectionPart != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    selectionParts += selectionPart.first
+                    selectionArgs += selectionPart.second
+                } else {
+                    ignoredQueries += query
+                }
+                return@forEach
             }
         }
 
-        return listOfDocuments
+        logIgnoredQueriesIfNeeded(ignoredQueries)
+
+        val sortOrder = sortClauses.takeIf { it.isNotEmpty() }?.joinToString(", ")
+        val selection = selectionParts.takeIf { it.isNotEmpty() }?.joinToString(" AND ")
+        val queryArgs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            (limit != null || offset != null || selection != null || sortOrder != null)
+        ) {
+            Bundle().apply {
+                if (selection != null) {
+                    putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
+                    putStringArray(
+                        ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,
+                        selectionArgs.toTypedArray(),
+                    )
+                }
+
+                if (sortOrder != null) {
+                    putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, sortOrder)
+                }
+
+                if (limit != null) putInt(ContentResolver.QUERY_ARG_LIMIT, limit)
+                if (offset != null) putInt(ContentResolver.QUERY_ARG_OFFSET, offset)
+            }
+        } else {
+            null
+        }
+
+        val cursor = getCursor(
+            context,
+            childrenUri,
+            projection,
+            queryArgs,
+            selection,
+            selectionArgs.takeIf { it.isNotEmpty() }?.toTypedArray(),
+            sortOrder,
+        ) ?: return emptyList()
+
+        return buildDocumentList(context, file, uri, cursor)
     }
 
     /**
      * Get [Cursor] from [ContentResolver.query] with given [projection] on a given [uri].
      */
-    fun getCursor(context: Context, uri: Uri, projection: Array<String>): Cursor? {
+    internal fun getCursor(context: Context, uri: Uri, projection: Array<String>): Cursor? {
+        return getCursor(context, uri, projection, null, null, null, null)
+    }
+
+    /**
+     * Get [Cursor] from [ContentResolver.query] using compiled provider query arguments.
+     */
+    internal fun getCursor(
+        context: Context,
+        uri: Uri,
+        projection: Array<String>,
+        queryArgs: Bundle?,
+        selection: String?,
+        selectionArgs: Array<String>?,
+        sortOrder: String?,
+    ): Cursor? {
         return try {
-            context.contentResolver.query(
-                uri, projection, null, null, null
-            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (queryArgs != null) {
+                    context.contentResolver.query(uri, projection, queryArgs, null)
+                } else {
+                    context.contentResolver.query(uri, projection, null, null, null)
+                }
+            } else {
+                // Pre-O child document queries only have the legacy selection/sortOrder path.
+                // Our compiler ignores unsupported filters there, but still preserves sorting.
+                context.contentResolver.query(
+                    uri,
+                    projection,
+                    selection,
+                    selectionArgs,
+                    sortOrder,
+                )
+            }
         } catch (exception: Exception) {
-            /**
-             * This exception can occur in scenarios such as -
-             *
-             * - The Uri became invalid due to external changes (e.g., permissions revoked, storage unmounted, etc.).
-             * - The file or directory represented by this Uri was probably deleted or became `inaccessible` after the Uri was obtained but before this operation was performed.
-             */
             ErrorLogger.logError("Exception while building the Cursor", exception)
             null
+        }
+    }
+
+    private fun logIgnoredQueriesIfNeeded(ignoredQueries: List<Query>) {
+        if (ignoredQueries.isEmpty()) return
+
+        ErrorLogger.logWarning(
+            buildString {
+                append("Ignored unsupported queries on API ")
+                append(Build.VERSION.SDK_INT)
+                append(": ")
+                append(ignoredQueries.joinToString { Query.describe(it) })
+                append(". SAF child-document filtering, limit, and offset require API 26+.")
+            }
+        )
+    }
+
+    @JvmSynthetic
+    internal fun buildDocumentList(
+        context: Context,
+        file: DocumentFileCompat,
+        treeUri: Uri,
+        cursor: Cursor,
+    ): List<DocumentFileCompat> {
+        val listOfDocuments = arrayListOf<DocumentFileCompat>()
+
+        return try {
+            cursor.use {
+                val itemCount = cursor.count
+                /**
+                 * Pre-sizing the list to avoid resizing overhead.
+                 * This is especially beneficial for directories with a large number of files.
+                 *
+                 * Memory comparison for 8192 files:
+                 * 1. With pre-sizing: 3.10 MB
+                 * 2. Without pre-sizing: 9.60 MB
+                 */
+                if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
+
+                val idIndex = cursor.getColumnIndex(Document.COLUMN_DOCUMENT_ID)
+                if (idIndex == -1) {
+                    ErrorLogger.logWarning(
+                        "Missing ${Document.COLUMN_DOCUMENT_ID} column in child document cursor."
+                    )
+                    return emptyList()
+                }
+
+                val nameIndex = cursor.getColumnIndex(Document.COLUMN_DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(Document.COLUMN_SIZE)
+                val modifiedIndex = cursor.getColumnIndex(Document.COLUMN_LAST_MODIFIED)
+                val mimeIndex = cursor.getColumnIndex(Document.COLUMN_MIME_TYPE)
+                if (mimeIndex == -1) {
+                    ErrorLogger.logWarning(
+                        "Missing ${Document.COLUMN_MIME_TYPE} column in child document cursor."
+                    )
+                    return emptyList()
+                }
+
+                val flagsIndex = cursor.getColumnIndex(Document.COLUMN_FLAGS)
+
+                while (cursor.moveToNext()) {
+                    val documentId = cursor.getString(idIndex) ?: continue
+                    val documentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+
+                    val documentName = getStringOrDefault(cursor, nameIndex)
+                    val documentSize = getLongOrDefault(cursor, sizeIndex)
+                    val lastModifiedTime = getLongOrDefault(cursor, modifiedIndex, -1L)
+                    val documentMimeType = cursor.getString(mimeIndex) ?: continue
+
+                    /**
+                     * Default flags to 0 (no capabilities) when not included.
+                     * Using `-1` here would make bitwise checks behave as "all flags set".
+                     */
+                    val documentFlags = getLongOrDefault(cursor, flagsIndex, 0L).toInt()
+
+                    /* return correct document type */
+                    val childFile: DocumentFileCompat =
+                        if (documentMimeType == Document.MIME_TYPE_DIR) {
+                            TreeDocumentFileCompat(
+                                context, documentUri, documentName,
+                                documentSize, lastModifiedTime,
+                                documentMimeType, documentFlags
+                            )
+                        } else {
+                            SingleDocumentFileCompat(
+                                context, documentUri, documentName,
+                                documentSize, lastModifiedTime,
+                                documentMimeType, documentFlags
+                            )
+                        }
+                    childFile.parentFile = file
+                    listOfDocuments.add(childFile)
+                }
+            }
+
+            listOfDocuments
+        } catch (exception: Exception) {
+            ErrorLogger.logError("Exception while building child document list", exception)
+            emptyList()
         }
     }
 

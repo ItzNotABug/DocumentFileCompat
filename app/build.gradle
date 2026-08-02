@@ -3,14 +3,14 @@ plugins {
 }
 
 android {
-    compileSdk = 36
+    compileSdk = 37
     namespace = "com.lazygeniouz.filecompat.example"
 
     defaultConfig {
         applicationId = "com.lazygeniouz.filecompat.example"
 
         minSdk = 23
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 
@@ -36,10 +36,10 @@ android {
 
 dependencies {
     implementation project(":dfc")
-    // implementation "com.lazygeniouz:dfc:1.3"
+    // implementation "com.lazygeniouz:dfc:<version>"
 
     implementation "androidx.appcompat:appcompat:1.7.1"
-    implementation "androidx.activity:activity-ktx:1.12.3"
+    implementation "androidx.activity:activity-ktx:1.13.0"
     implementation "androidx.documentfile:documentfile:1.1.0"
-    implementation "com.google.android.material:material:1.13.0"
+    implementation "com.google.android.material:material:1.14.0"
 }

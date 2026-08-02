@@ -13,4 +13,11 @@ object ErrorLogger {
     internal fun logError(message: String, throwable: Throwable?) {
         Log.e("DocumentFileCompat", "$message: ${throwable?.message}")
     }
+
+    /**
+     * Log warning to logcat for non-fatal behavior differences.
+     */
+    internal fun logWarning(message: String) {
+        Log.w("DocumentFileCompat", message)
+    }
 }

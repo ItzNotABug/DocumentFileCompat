@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document.MIME_TYPE_DIR
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 
 /**
@@ -50,15 +51,12 @@ internal class TreeDocumentFileCompat(
         return treeFileUri?.let { make(context, treeFileUri, false) }
     }
 
-    /**
-     * This will return a list of [DocumentFileCompat] with the required fields based on the passed [projection].
-     */
-    override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
-        return fileController.listFiles(projection)
-    }
-
     override fun listFiles(): List<DocumentFileCompat> {
         return fileController.listFiles()
+    }
+
+    override fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
+        return fileController.listFiles(*queries)
     }
 
     /**
@@ -124,18 +122,15 @@ internal class TreeDocumentFileCompat(
             } else uri
 
             ResolverCompat.getCursor(context, treeUri, ResolverCompat.fullProjection)
-                ?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val documentName: String = cursor.getString(1)
-                        val documentSize: Long = cursor.getLong(2)
-                        val documentLastModified: Long = cursor.getLong(3)
-                        val documentMimeType: String = cursor.getString(4)
-                        val documentFlags: Int = cursor.getLong(5).toInt()
-
-                        return TreeDocumentFileCompat(
+                ?.let { cursor ->
+                    return DocumentFileCompat.fromCursor(
+                        cursor,
+                        "Exception while building a tree document file",
+                    ) { name, size, lastModified, mimeType, flags ->
+                        TreeDocumentFileCompat(
                             context, treeUri,
-                            documentName, documentSize,
-                            documentLastModified, documentMimeType, documentFlags
+                            name, size,
+                            lastModified, mimeType, flags,
                         )
                     }
                 }

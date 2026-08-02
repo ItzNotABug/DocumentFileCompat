@@ -9,10 +9,10 @@ buildscript {
     }
 
     dependencies {
-        classpath "com.android.tools.build:gradle:9.0.0"
+        classpath "com.android.tools.build:gradle:9.3.1"
 
         classpath "org.jetbrains.dokka:dokka-gradle-plugin:2.2.0"
-        classpath "com.vanniktech:gradle-maven-publish-plugin:0.36.0"
+        classpath "com.vanniktech:gradle-maven-publish-plugin:0.37.0"
     }
 }
 
@@ -23,7 +23,7 @@ allprojects {
     }
 
     plugins.withId("com.vanniktech.maven.publish.base") {
-        version = "1.6"
+        version = "2.0"
         group = "com.lazygeniouz"
 
         mavenPublishing {
@@ -35,6 +35,13 @@ allprojects {
                     new SourcesJar.Sources(),
                     "release"
             ))
+        }
+
+        tasks.withType(org.gradle.jvm.tasks.Jar).matching { task ->
+            task.name == "dokkaJavadocJar"
+        }.configureEach { task ->
+            task.dependsOn(tasks.named("dokkaGenerateHtml"))
+            task.from(layout.buildDirectory.dir("dokka/html"))
         }
     }
 }

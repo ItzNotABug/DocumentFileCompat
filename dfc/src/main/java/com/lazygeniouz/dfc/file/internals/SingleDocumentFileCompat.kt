@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 
 /**
@@ -50,13 +51,10 @@ internal class SingleDocumentFileCompat(
         throw UnsupportedOperationException()
     }
 
-    /**
-     * Single document Uris don't have children, so projections are not applicable.
-     *
-     * @throws UnsupportedOperationException
-     */
-    override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
-        return listFiles()
+    override fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
+        throw UnsupportedOperationException(
+            "Queries are only supported for DocumentsProvider-backed tree URIs."
+        )
     }
 
     /**
@@ -113,18 +111,15 @@ internal class SingleDocumentFileCompat(
             if (!DocumentsContract.isDocumentUri(context, self)) return null
 
             ResolverCompat.getCursor(context, self, ResolverCompat.fullProjection)
-                ?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val documentName: String = cursor.getString(1)
-                        val documentSize: Long = cursor.getLong(2)
-                        val documentLastModified: Long = cursor.getLong(3)
-                        val documentMimeType: String = cursor.getString(4)
-                        val documentFlags: Int = cursor.getLong(5).toInt()
-
-                        return SingleDocumentFileCompat(
+                ?.let { cursor ->
+                    return DocumentFileCompat.fromCursor(
+                        cursor,
+                        "Exception while building a single document file",
+                    ) { name, size, lastModified, mimeType, flags ->
+                        SingleDocumentFileCompat(
                             context, self,
-                            documentName, documentSize,
-                            documentLastModified, documentMimeType, documentFlags
+                            name, size,
+                            lastModified, mimeType, flags,
                         )
                     }
                 }

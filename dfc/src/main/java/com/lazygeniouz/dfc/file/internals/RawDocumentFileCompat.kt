@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.dfc.logger.ErrorLogger.logError
 import java.io.File
 
@@ -103,13 +104,10 @@ internal class RawDocumentFileCompat(context: Context, var file: File) :
         return file.listFiles()?.map { child -> fromFile(context, child) } ?: emptyList()
     }
 
-    /**
-     * Returns list of files using File API.
-     *
-     * Note: [projection] is ignored as the File API doesn't support it.
-     */
-    override fun listFiles(projection: Array<String>): List<DocumentFileCompat> {
-        return listFiles()
+    override fun listFiles(vararg queries: Query): List<DocumentFileCompat> {
+        throw UnsupportedOperationException(
+            "Queries are only supported for DocumentsProvider-backed tree URIs."
+        )
     }
 
     /**

@@ -1,0 +1,88 @@
+package com.lazygeniouz.dfc.file;
+
+import android.provider.DocumentsContract.Document;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+public class DocumentFileCompatJavaApiTest {
+
+    @Test
+    public void queryFactoriesAreCallableFromJavaSource() {
+        Query[] queries = new Query[] {
+            Query.filesOnly(),
+            Query.orderByDesc(Document.COLUMN_LAST_MODIFIED),
+            Query.in(Document.COLUMN_MIME_TYPE, "image/png", "image/jpeg"),
+            Query.notIn(Document.COLUMN_MIME_TYPE, "application/pdf"),
+            Query.anyOf(Query.mimeType("image/png"), Query.mimeType("image/jpeg")),
+            Query.allOf(Query.filesOnly(), Query.sizeGreaterThan(0L)),
+            Query.not(Query.directoriesOnly()),
+            Query.limit(100),
+        };
+
+        assertEquals(8, queries.length);
+    }
+
+    @SuppressWarnings("unused")
+    private static void listFilesOverloadsAreCallableFromJavaSource(DocumentFileCompat file) {
+        file.listFiles();
+        file.listFiles(Query.limit(1));
+        file.listFiles(new Query[] { Query.limit(1), Query.filesOnly() });
+    }
+
+    @Test
+    public void queryListingUsesOnlyListFilesAsPublicName() {
+        Method[] methods = DocumentFileCompat.class.getMethods();
+
+        assertFalse(
+            Arrays.stream(methods).anyMatch(method -> method.getName().equals("queryFiles"))
+        );
+        assertTrue(
+            Arrays.stream(methods).anyMatch(method ->
+                method.getName().equals("listFiles")
+                    && Arrays.equals(method.getParameterTypes(), new Class<?>[] { Query[].class })
+            )
+        );
+        assertFalse(
+            Arrays.stream(methods).anyMatch(method ->
+                method.getName().equals("listFiles")
+                    && Arrays.equals(method.getParameterTypes(), new Class<?>[] { String[].class })
+            )
+        );
+    }
+
+    @Test
+    public void internalCursorHelperIsSyntheticOnJavaSide() {
+        Method[] methods = DocumentFileCompat.Companion.getClass().getMethods();
+
+        assertTrue(
+            Arrays.stream(methods).anyMatch(method ->
+                method.getName().startsWith("fromCursor") && method.isSynthetic()
+            )
+        );
+        assertFalse(
+            Arrays.stream(methods).anyMatch(method ->
+                method.getName().equals("fromCursor") && !method.isSynthetic()
+            )
+        );
+    }
+
+    @Test
+    public void queryInternalApiIsSyntheticOnJavaSide() {
+        Method[] methods = Query.Companion.getClass().getMethods();
+
+        assertTrue(
+            Arrays.stream(methods).anyMatch(method ->
+                method.getName().startsWith("projectionColumns") && method.isSynthetic()
+            )
+        );
+        assertTrue(
+            Arrays.stream(Query.class.getConstructors()).allMatch(Constructor::isSynthetic)
+        );
+    }
+}

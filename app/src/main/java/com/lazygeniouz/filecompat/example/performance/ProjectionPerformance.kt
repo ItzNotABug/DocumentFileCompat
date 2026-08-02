@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.DocumentsContract.Document
 import androidx.documentfile.provider.DocumentFile
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.file.Query
 import com.lazygeniouz.filecompat.example.performance.Performance.measureTimeSeconds
 
 object ProjectionPerformance {
@@ -18,10 +19,10 @@ object ProjectionPerformance {
         // Test 1: Full projection (default)
         results += testFullProjection(context, uri) + "\n\n"
 
-        // Test 2: Minimal projection (ID + Name only)
+        // Test 2: Minimal requested projection.
         results += testMinimalProjection(context, uri) + "\n\n"
 
-        // Test 3: ID + Name + Size
+        // Test 3: Partial requested projection.
         results += testPartialProjection(context, uri) + "\n\n"
 
         results += "=".repeat(48).plus("\n\n")
@@ -52,12 +53,12 @@ object ProjectionPerformance {
         var fileCount = 0
         measureTimeSeconds {
             val documentFile = DocumentFileCompat.fromTreeUri(context, uri)
-            // Only fetch ID and Name
+            // MIME type is still added internally so child files keep the right behavior.
             val minimalProjection = arrayOf(
                 Document.COLUMN_DOCUMENT_ID,
                 Document.COLUMN_DISPLAY_NAME
             )
-            val files = documentFile?.listFiles(minimalProjection)
+            val files = documentFile?.listFiles(Query.select(*minimalProjection))
             fileCount = files?.size ?: 0
 
             // Verify we can access the names
@@ -65,7 +66,7 @@ object ProjectionPerformance {
                 val name = file.name // Should work
             }
         }.also { time ->
-            return "Minimal Projection (ID + Name):\n" +
+            return "Minimal Projection (ID + Name; MIME added internally):\n" +
                     "Files: $fileCount\n" +
                     "Time: ${time}s"
         }
@@ -76,13 +77,13 @@ object ProjectionPerformance {
         var totalSize = 0L
         measureTimeSeconds {
             val documentFile = DocumentFileCompat.fromTreeUri(context, uri)
-            // Fetch ID, Name, and Size
+            // MIME type is still added internally so child files keep the right behavior.
             val partialProjection = arrayOf(
                 Document.COLUMN_DOCUMENT_ID,
                 Document.COLUMN_DISPLAY_NAME,
                 Document.COLUMN_SIZE
             )
-            val files = documentFile?.listFiles(partialProjection)
+            val files = documentFile?.listFiles(Query.select(*partialProjection))
             fileCount = files?.size ?: 0
 
             // Calculate total size
@@ -91,7 +92,7 @@ object ProjectionPerformance {
             }
         }.also { time ->
             val sizeMb = Performance.getSizeInMb(totalSize)
-            return "Partial Projection (ID + Name + Size):\n" +
+            return "Partial Projection (ID + Name + Size; MIME added internally):\n" +
                     "Files: $fileCount\n" +
                     "Total Size: $sizeMb\n" +
                     "Time: ${time}s"

@@ -21,7 +21,7 @@ do not keep paying for the same queries again and again.
 - Raw `File` access via `fromFile(...)`.
 - Common `DocumentFile`-style methods and getters.
 - Faster directory listing and metadata access.
-- Custom projections for lighter queries.
+- Query-based child listing for projection, filtering, sorting, and paging.
 - Convenience APIs like `count()`, `copyTo(destination)`, and `copyFrom(source)`.
 
 ## Installation
@@ -67,8 +67,46 @@ Other entry points:
 - `DocumentFileCompat.fromSingleUri(context, uri)`
 - `DocumentFileCompat.fromFile(context, file)`
 
-Additional helpers like `count()`, `copyTo(destination)`, `copyFrom(source)`, and
-`listFiles(projection)` are available when you need them.
+Additional helpers like `count()`, `copyTo(destination)`, `copyFrom(source)`,
+and `listFiles(vararg queries)` are available when you need them.
+
+### Query Child Documents
+
+For tree-backed SAF directories, `Query` lets you pass projection, sort, filter, limit, and offset
+hints without dropping down to raw `ContentResolver` code.
+
+```kotlin
+import android.provider.DocumentsContract.Document
+import com.lazygeniouz.dfc.file.Query
+
+val recentFiles = directory.listFiles(
+    Query.filesOnly(),
+    Query.orderByDesc(Document.COLUMN_LAST_MODIFIED),
+    Query.limit(100),
+    Query.select(
+        Document.COLUMN_DISPLAY_NAME,
+        Document.COLUMN_SIZE,
+    ),
+)
+```
+
+On API 21-25, only `Query.select(...)`, `Query.orderByAsc(...)`, and `Query.orderByDesc(...)`
+are forwarded. On API 26+, filters, `Query.limit(...)`, and `Query.offset(...)` are also forwarded.
+
+Providers may still ignore supported query arguments. `DocumentFileCompat` forwards them, but the
+underlying provider decides what actually gets honored.
+
+Some quick tips:
+
+- Use `Query.select(...)` to narrow fetched metadata. `DocumentFileCompat` still adds the
+  internal columns it needs for child Uris, document types, and capability checks.
+- Use `Query.anyOf(...)`, `Query.allOf(...)`, and `Query.not(...)` for grouped filter logic.
+- Use `Query.limit(...)` for previews, search results, and paged lists.
+- Prefer exact filters like `filesOnly()`, `mimeType(...)`, and `nameEquals(...)` over broad
+  `nameContains(...)` queries.
+- Avoid repeated `listFiles(...)` calls for the same directory; reuse the returned list when you
+  can.
+- Treat queries as fast-path provider hints, not guaranteed filtering across every provider.
 
 ## Performance
 
