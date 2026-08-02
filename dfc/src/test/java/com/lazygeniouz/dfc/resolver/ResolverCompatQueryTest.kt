@@ -161,6 +161,79 @@ class ResolverCompatQueryTest {
     }
 
     @Test
+    fun `query unions multiple select clauses`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        root.listFiles(
+            Query.select(Document.COLUMN_DISPLAY_NAME),
+            Query.select(Document.COLUMN_SIZE, Document.COLUMN_DISPLAY_NAME),
+            Query.orderByAsc(Document.COLUMN_DISPLAY_NAME),
+        )
+
+        assertEquals(
+            listOf(
+                Document.COLUMN_DOCUMENT_ID,
+                Document.COLUMN_MIME_TYPE,
+                Document.COLUMN_DISPLAY_NAME,
+                Document.COLUMN_SIZE,
+                Document.COLUMN_FLAGS,
+            ),
+            provider.lastChildProjection?.toList(),
+        )
+    }
+
+    @Test
+    fun `query forwards compound sort order in query order`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        root.listFiles(
+            Query.orderByDesc(Document.COLUMN_LAST_MODIFIED),
+            Query.orderByAsc(Document.COLUMN_DISPLAY_NAME),
+        )
+
+        assertEquals(
+            "${Document.COLUMN_LAST_MODIFIED} DESC, ${Document.COLUMN_DISPLAY_NAME} ASC",
+            provider.lastQueryArgs?.getString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER),
+        )
+    }
+
+    @Test
+    fun `query repeated limit and offset use last values`() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = TreeDocumentFileCompat(
+            context = context,
+            documentUri = TestDocumentsProvider.rootDocumentUri(),
+            documentName = "root",
+            documentMimeType = Document.MIME_TYPE_DIR,
+            documentFlags = Document.FLAG_DIR_SUPPORTS_CREATE,
+        )
+
+        root.listFiles(
+            Query.limit(10),
+            Query.offset(5),
+            Query.limit(2),
+            Query.offset(1),
+        )
+
+        assertEquals(2, provider.lastQueryArgs?.getInt(ContentResolver.QUERY_ARG_LIMIT))
+        assertEquals(1, provider.lastQueryArgs?.getInt(ContentResolver.QUERY_ARG_OFFSET))
+    }
+
+    @Test
     fun `query joins api 26 filter bundle arguments with and`() {
         val context = RuntimeEnvironment.getApplication()
         val root = TreeDocumentFileCompat(

@@ -43,6 +43,22 @@ class QueryTest {
     }
 
     @Test
+    fun `in with only null compiles to is null`() {
+        val selectionPart = Query.`in`(Document.COLUMN_MIME_TYPE, null).selectionPart()!!
+
+        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NULL)", selectionPart.first)
+        assertTrue(selectionPart.second.isEmpty())
+    }
+
+    @Test
+    fun `notIn with only null compiles to is not null`() {
+        val selectionPart = Query.notIn(Document.COLUMN_MIME_TYPE, null).selectionPart()!!
+
+        assertEquals("(${Document.COLUMN_MIME_TYPE} IS NOT NULL)", selectionPart.first)
+        assertTrue(selectionPart.second.isEmpty())
+    }
+
+    @Test
     fun `equal with null becomes isNull selection`() {
         val selectionPart = Query.equal(Document.COLUMN_MIME_TYPE, null).selectionPart()!!
 
@@ -74,6 +90,14 @@ class QueryTest {
 
         assertEquals("(${Document.COLUMN_DISPLAY_NAME} != ?)", selectionPart.first)
         assertEquals(listOf("report.pdf"), selectionPart.second)
+    }
+
+    @Test
+    fun `boolean values compile to numeric sql args`() {
+        val selectionPart = Query.equal(Document.COLUMN_FLAGS, true).selectionPart()!!
+
+        assertEquals("(${Document.COLUMN_FLAGS} = ?)", selectionPart.first)
+        assertEquals(listOf("1"), selectionPart.second)
     }
 
     @Test
@@ -240,6 +264,30 @@ class QueryTest {
 
         assertEquals("(${Document.COLUMN_MIME_TYPE} IN (?,?))", selectionPart.first)
         assertEquals(listOf("image/png", "image/jpeg"), selectionPart.second)
+    }
+
+    @Test
+    fun `sizeLessThan maps to size less than selection`() {
+        val selectionPart = Query.sizeLessThan(1024L).selectionPart()!!
+
+        assertEquals("(${Document.COLUMN_SIZE} < ?)", selectionPart.first)
+        assertEquals(listOf("1024"), selectionPart.second)
+    }
+
+    @Test
+    fun `lastModifiedAfter maps to last modified greater than selection`() {
+        val selectionPart = Query.lastModifiedAfter(123L).selectionPart()!!
+
+        assertEquals("(${Document.COLUMN_LAST_MODIFIED} > ?)", selectionPart.first)
+        assertEquals(listOf("123"), selectionPart.second)
+    }
+
+    @Test
+    fun `lastModifiedBefore maps to last modified less than selection`() {
+        val selectionPart = Query.lastModifiedBefore(456L).selectionPart()!!
+
+        assertEquals("(${Document.COLUMN_LAST_MODIFIED} < ?)", selectionPart.first)
+        assertEquals(listOf("456"), selectionPart.second)
     }
 
     @Test
