@@ -19,14 +19,14 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.O], manifest = Config.NONE)
-class DocumentFileCompatMakeTest {
+class DocumentFileCompatFromCursorTest {
 
     @Test
-    fun `makeFromCursor reads columns by name`() {
+    fun `fromCursor reads columns by name`() {
         val context = RuntimeEnvironment.getApplication()
         val uri = Uri.parse("content://com.lazygeniouz.dfc.test.documents/document/root%2Fnotes.txt")
 
-        val file = DocumentFileCompat.makeFromCursor(
+        val file = DocumentFileCompat.fromCursor(
             shuffledDocumentCursor(),
             "test",
         ) { name, size, lastModified, mime, flags ->
@@ -42,26 +42,26 @@ class DocumentFileCompatMakeTest {
     }
 
     @Test
-    fun `single makeFromCursor returns null when cursor read throws`() {
+    fun `single fromCursor returns null when cursor read throws`() {
         val context = RuntimeEnvironment.getApplication()
         val uri = Uri.parse("content://com.lazygeniouz.dfc.test.documents/document/root%2Fnotes.txt")
         val cursor = throwingCursor(documentCursor("text/plain"))
 
         assertNull(
-            DocumentFileCompat.makeFromCursor(cursor, "test") { name, size, lastModified, mime, flags ->
+            DocumentFileCompat.fromCursor(cursor, "test") { name, size, lastModified, mime, flags ->
                 SingleDocumentFileCompat(context, uri, name, size, lastModified, mime, flags)
             }
         )
     }
 
     @Test
-    fun `tree makeFromCursor returns null when cursor read throws`() {
+    fun `tree fromCursor returns null when cursor read throws`() {
         val context = RuntimeEnvironment.getApplication()
         val uri = Uri.parse("content://com.lazygeniouz.dfc.test.documents/tree/root/document/root")
         val cursor = throwingCursor(documentCursor(Document.MIME_TYPE_DIR))
 
         assertNull(
-            DocumentFileCompat.makeFromCursor(cursor, "test") { name, size, lastModified, mime, flags ->
+            DocumentFileCompat.fromCursor(cursor, "test") { name, size, lastModified, mime, flags ->
                 TreeDocumentFileCompat(context, uri, name, size, lastModified, mime, flags)
             }
         )

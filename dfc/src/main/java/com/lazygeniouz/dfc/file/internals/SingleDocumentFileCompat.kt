@@ -105,7 +105,7 @@ internal class SingleDocumentFileCompat(
 
             ResolverCompat.getCursor(context, self, ResolverCompat.fullProjection)
                 ?.let { cursor ->
-                    return DocumentFileCompat.makeFromCursor(
+                    return DocumentFileCompat.fromCursor(
                         cursor,
                         "Exception while building a single document file",
                     ) { name, size, lastModified, mimeType, flags ->

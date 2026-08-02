@@ -62,12 +62,12 @@ public class DocumentFileCompatJavaApiTest {
 
         assertTrue(
             Arrays.stream(methods).anyMatch(method ->
-                method.getName().startsWith("makeFromCursor") && method.isSynthetic()
+                method.getName().startsWith("fromCursor") && method.isSynthetic()
             )
         );
         assertFalse(
             Arrays.stream(methods).anyMatch(method ->
-                method.getName().equals("makeFromCursor") && !method.isSynthetic()
+                method.getName().equals("fromCursor") && !method.isSynthetic()
             )
         );
     }

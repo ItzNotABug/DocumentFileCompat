@@ -265,7 +265,7 @@ abstract class DocumentFileCompat(
         }
 
         @JvmSynthetic
-        internal fun <T : DocumentFileCompat> makeFromCursor(
+        internal fun <T : DocumentFileCompat> fromCursor(
             cursor: Cursor,
             errorMessage: String,
             buildFile: (

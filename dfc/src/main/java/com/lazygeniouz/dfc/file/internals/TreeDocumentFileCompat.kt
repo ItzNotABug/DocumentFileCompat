@@ -123,7 +123,7 @@ internal class TreeDocumentFileCompat(
 
             ResolverCompat.getCursor(context, treeUri, ResolverCompat.fullProjection)
                 ?.let { cursor ->
-                    return DocumentFileCompat.makeFromCursor(
+                    return DocumentFileCompat.fromCursor(
                         cursor,
                         "Exception while building a tree document file",
                     ) { name, size, lastModified, mimeType, flags ->
