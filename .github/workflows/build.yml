@@ -23,7 +23,6 @@ on:
 
 jobs:
   build:
-    name: Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,8 +38,7 @@ jobs:
       - name: Build
         run: ./gradlew :dfc:assemble :dfc:testDebugUnitTest :app:assembleDebug
 
-  connected-tests:
-    name: Android instrumentation tests
+  android-instrumentation-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
