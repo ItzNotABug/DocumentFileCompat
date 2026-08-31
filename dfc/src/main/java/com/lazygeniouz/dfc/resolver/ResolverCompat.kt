@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
+import android.os.CancellationSignal
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import com.lazygeniouz.dfc.file.DocumentFileCompat
@@ -122,9 +123,7 @@ internal object ResolverCompat {
         file: DocumentFileCompat,
         projection: Array<String> = fullProjection,
     ): List<DocumentFileCompat> {
-        val uri = file.uri
-        val childrenUri = createChildrenUri(uri)
-        val listOfDocuments = arrayListOf<DocumentFileCompat>()
+        val childrenUri = createChildrenUri(file.uri)
 
         val finalProjection = arrayOf(
             Document.COLUMN_DOCUMENT_ID, /* identifier */
@@ -133,64 +132,138 @@ internal object ResolverCompat {
         ).distinct().toTypedArray()
 
         val cursor = getCursor(context, childrenUri, finalProjection) ?: return emptyList()
+        return cursor.use { readChildren(context, it, file) }
+    }
 
-        cursor.use {
-            val itemCount = cursor.count
-            /**
-             * Pre-sizing the list to avoid resizing overhead.
-             * This is especially beneficial for directories with a large number of files.
-             *
-             * Memory comparison for 8192 files:
-             * 1. With pre-sizing: 3.10 MB
-             * 2. Without pre-sizing: 9.60 MB
-             */
-            if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
+    /** Read direct children from [cursor], advancing it without closing it. */
+    internal fun readChildren(
+        context: Context,
+        cursor: Cursor,
+        parent: DocumentFileCompat,
+    ): List<DocumentFileCompat> {
+        val itemCount = cursor.count
+        val listOfDocuments = arrayListOf<DocumentFileCompat>()
+        if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
 
-            // Resolve column indices dynamically
-            val idIndex = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
+        forEachChild(context, cursor, parent, emptyMap(), null, strictIds = false) { _, child ->
+            listOfDocuments.add(child)
+        }
+        return listOfDocuments
+    }
 
-            val nameIndex = cursor.getColumnIndex(Document.COLUMN_DISPLAY_NAME)
-            val sizeIndex = cursor.getColumnIndex(Document.COLUMN_SIZE)
-            val modifiedIndex = cursor.getColumnIndex(Document.COLUMN_LAST_MODIFIED)
-            val mimeIndex = cursor.getColumnIndex(Document.COLUMN_MIME_TYPE)
-            val flagsIndex = cursor.getColumnIndex(Document.COLUMN_FLAGS)
-
-            while (cursor.moveToNext()) {
-                val documentId = cursor.getString(idIndex) ?: continue
-                val documentUri = DocumentsContract.buildDocumentUriUsingTree(uri, documentId)
-
-                val documentName = getStringOrDefault(cursor, nameIndex)
-                val documentSize = getLongOrDefault(cursor, sizeIndex)
-                val lastModifiedTime = getLongOrDefault(cursor, modifiedIndex, -1L)
-                val documentMimeType = getStringOrDefault(cursor, mimeIndex)
-
-                /**
-                 * Default flags to 0 (no capabilities) when not included.
-                 * Using `-1` here would make bitwise checks behave as "all flags set".
-                 */
-                val documentFlags = getLongOrDefault(cursor, flagsIndex, 0L).toInt()
-
-                /* return correct document type */
-                val childFile: DocumentFileCompat =
-                    if (documentMimeType == Document.MIME_TYPE_DIR) {
-                        TreeDocumentFileCompat(
-                            context, documentUri, documentName,
-                            documentSize, lastModifiedTime,
-                            documentMimeType, documentFlags
-                        )
-                    } else {
-                        SingleDocumentFileCompat(
-                            context, documentUri, documentName,
-                            documentSize, lastModifiedTime,
-                            documentMimeType, documentFlags
-                        )
-                    }
-                childFile.parentFile = file
-                listOfDocuments.add(childFile)
+    /**
+     * Reads an observer snapshot directly into a map keyed by document id. Unchanged rows reuse
+     * their previous [DocumentFileCompat] instance; malformed or duplicate ids reject the entire
+     * scan so malformed rows cannot be interpreted as deletions.
+     */
+    internal fun readChildSnapshot(
+        context: Context,
+        cursor: Cursor,
+        parent: DocumentFileCompat,
+        reusable: Map<String, DocumentFileCompat>,
+        cancellationSignal: CancellationSignal,
+    ): LinkedHashMap<String, DocumentFileCompat> {
+        val snapshot = LinkedHashMap<String, DocumentFileCompat>(mapCapacity(cursor.count))
+        forEachChild(
+            context, cursor, parent, reusable, cancellationSignal, strictIds = true
+        ) { documentId, child ->
+            check(snapshot.put(documentId, child) == null) {
+                "Directory query returned duplicate document id: $documentId"
             }
         }
+        return snapshot
+    }
 
-        return listOfDocuments
+    private inline fun forEachChild(
+        context: Context,
+        cursor: Cursor,
+        parent: DocumentFileCompat,
+        reusable: Map<String, DocumentFileCompat>,
+        cancellationSignal: CancellationSignal?,
+        strictIds: Boolean,
+        onChild: (documentId: String, child: DocumentFileCompat) -> Unit,
+    ) {
+        val idIndex = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
+        val nameIndex = cursor.getColumnIndex(Document.COLUMN_DISPLAY_NAME)
+        val sizeIndex = cursor.getColumnIndex(Document.COLUMN_SIZE)
+        val modifiedIndex = cursor.getColumnIndex(Document.COLUMN_LAST_MODIFIED)
+        val mimeIndex = cursor.getColumnIndex(Document.COLUMN_MIME_TYPE)
+        val flagsIndex = cursor.getColumnIndex(Document.COLUMN_FLAGS)
+
+        var row = 0
+        while (cursor.moveToNext()) {
+            if ((row++ and CANCELLATION_CHECK_MASK) == 0) {
+                cancellationSignal?.throwIfCanceled()
+            }
+
+            val documentId = cursor.getString(idIndex)
+            if (documentId.isNullOrEmpty()) {
+                check(!strictIds) { "Directory query returned an empty document id" }
+                continue
+            }
+
+            val documentName = getStringOrDefault(cursor, nameIndex)
+            val documentSize = getLongOrDefault(cursor, sizeIndex)
+            val lastModifiedTime = getLongOrDefault(cursor, modifiedIndex, -1L)
+            val documentMimeType = getStringOrDefault(cursor, mimeIndex)
+
+            /**
+             * Default flags to 0 (no capabilities) when not included.
+             * Using `-1` here would make bitwise checks behave as "all flags set".
+             */
+            val documentFlags = getLongOrDefault(cursor, flagsIndex, 0L).toInt()
+
+            val previous = reusable[documentId]
+            val child = if (previous != null && canReuse(
+                    previous, documentName, documentSize,
+                    lastModifiedTime, documentMimeType, documentFlags
+                )
+            ) {
+                previous
+            } else {
+                buildChild(
+                    context, parent, documentId, documentName,
+                    documentSize, lastModifiedTime, documentMimeType, documentFlags
+                )
+            }
+            onChild(documentId, child)
+        }
+        cancellationSignal?.throwIfCanceled()
+    }
+
+    // Identical fields (flags included: capabilities may change without a diff event).
+    private fun canReuse(
+        previous: DocumentFileCompat,
+        name: String, size: Long, lastModified: Long, mimeType: String, flags: Int,
+    ): Boolean {
+        return previous.name == name
+                && previous.length == size
+                && previous.lastModified == lastModified
+                && previous.documentMimeType == mimeType
+                && previous.documentFlags == flags
+    }
+
+    // Builds the correctly typed document for a child row.
+    private fun buildChild(
+        context: Context, parent: DocumentFileCompat, documentId: String,
+        name: String, size: Long, lastModified: Long, mimeType: String, flags: Int,
+    ): DocumentFileCompat {
+        val documentUri = DocumentsContract.buildDocumentUriUsingTree(parent.uri, documentId)
+
+        val childFile: DocumentFileCompat = if (mimeType == Document.MIME_TYPE_DIR) {
+            TreeDocumentFileCompat(context, documentUri, name, size, lastModified, mimeType, flags)
+        } else {
+            SingleDocumentFileCompat(context, documentUri, name, size, lastModified, mimeType, flags)
+        }
+
+        childFile.parentFile = parent
+        return childFile
+    }
+
+    private fun mapCapacity(expectedSize: Int): Int = when {
+        expectedSize < 3 -> expectedSize + 1
+        expectedSize < 1 shl 30 -> expectedSize + expectedSize / 3 + 1
+        else -> Int.MAX_VALUE
     }
 
     /**
@@ -214,9 +287,11 @@ internal object ResolverCompat {
     }
 
     // Make children uri for query.
-    private fun createChildrenUri(uri: Uri): Uri {
+    internal fun createChildrenUri(uri: Uri): Uri {
         return DocumentsContract.buildChildDocumentsUriUsingTree(
             uri, DocumentsContract.getDocumentId(uri)
         )
     }
+
+    private const val CANCELLATION_CHECK_MASK = 63
 }

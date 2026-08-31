@@ -3,12 +3,21 @@ package com.lazygeniouz.dfc.file
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import android.os.FileObserver
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import com.lazygeniouz.dfc.controller.DocumentController
+import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.ALL_EVENTS
+import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.CREATE
+import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.DELETE
+import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.MODIFY
+import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.MOVED_FROM
+import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.MOVED_TO
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.observer.DirectoryWatcher
+import java.io.Closeable
 import java.io.File
 
 /**
@@ -195,14 +204,97 @@ abstract class DocumentFileCompat(
     }
 
     /**
-     * Converts a non serializable [DocumentFileCompat] to a serializable [SerializedFile].
+     * Converts a non-serializable [DocumentFileCompat] to a serializable [SerializedFile].
      */
     @Suppress("MemberVisibilityCanBePrivate")
     fun serialize(): SerializedFile {
         return SerializedFile.from(this)
     }
 
+    /**
+     * Observe the **direct children** of this directory for changes, without polling —
+     * the SAF equivalent of [FileObserver].
+     *
+     * The returned [Observer] is **not started**; call [Observer.startWatching] to begin &
+     * [Observer.stopWatching] when done (an unstopped observer leaks a cursor & a thread).
+     * Existing children emit no events & callbacks run on the observer's worker thread.
+     * Events are net snapshot changes, so rapid intermediate states can coalesce. Each refresh
+     * scans all direct children, and providers that return partial/loading cursors are unsupported.
+     *
+     * Event constants alias [FileObserver]'s bit values, unsupported bits in the [mask] are
+     * ignored. A same-id rename emits [MOVED_FROM] (old name) then [MOVED_TO] (new name); an
+     * id-changing rename surfaces as [DELETE] + [CREATE]. [MODIFY] is best-effort & providers
+     * that don't publish change notifications cannot be observed.
+     *
+     * @param mask Bitwise OR of the events to receive, [ALL_EVENTS] by default.
+     * @param listener Called with the event & the affected [DocumentFileCompat].
+     *
+     * @throws UnsupportedOperationException if this document is not a SAF backed directory.
+     * @throws IllegalArgumentException if the [mask] contains no supported event.
+     */
+    fun observe(
+        mask: Int = ALL_EVENTS,
+        listener: (event: Int, document: DocumentFileCompat) -> Unit,
+    ): Observer {
+        if (this !is TreeDocumentFileCompat || !isDirectory()) {
+            throw UnsupportedOperationException(
+                "observe() requires a directory backed by a SAF tree uri."
+            )
+        }
+
+        val effectiveMask = mask and ALL_EVENTS
+        require(effectiveMask != 0) { "The mask contains no supported event." }
+
+        return Observer(DirectoryWatcher(this, effectiveMask, listener))
+    }
+
+    /**
+     * A directory observation created via [observe]. Start/stop operations are idempotent and
+     * thread-safe, including from inside callbacks. Also a [Closeable] ([close] == [stopWatching]).
+     */
+    class Observer internal constructor(private val watcher: DirectoryWatcher) : Closeable {
+
+        /**
+         * Starts a new observation session.
+         *
+         * [onReady] runs once the initial snapshot is installed; mutations made after it begins
+         * are observable. [onError] runs only when that session stops because of a terminal
+         * initialization or permission failure. Both callbacks run on the observer worker.
+         * Calls made while already started are ignored, including their callbacks.
+         */
+        fun startWatching(
+            onError: (Throwable) -> Unit = {},
+            onReady: () -> Unit = {},
+        ) = watcher.startWatching(onError, onReady)
+
+        /**
+         * Invalidates the session and prevents further event callbacks before returning. Cleanup
+         * then completes on the worker after any provider operation already in flight returns.
+         */
+        fun stopWatching() = watcher.stopWatching()
+
+        override fun close() = stopWatching()
+    }
+
     companion object {
+
+        /** Same as [FileObserver.MODIFY]: a child's contents / metadata changed. */
+        const val MODIFY = FileObserver.MODIFY
+
+        /** Same as [FileObserver.MOVED_FROM]: a child was renamed, carries the **old** name. */
+        const val MOVED_FROM = FileObserver.MOVED_FROM
+
+        /** Same as [FileObserver.MOVED_TO]: a child was renamed, carries the **new** name. */
+        const val MOVED_TO = FileObserver.MOVED_TO
+
+        /** Same as [FileObserver.CREATE]: a child was created. */
+        const val CREATE = FileObserver.CREATE
+
+        /** Same as [FileObserver.DELETE]: a child was deleted. */
+        const val DELETE = FileObserver.DELETE
+
+        /** Every event [observe] can produce (unlike [FileObserver.ALL_EVENTS]). */
+        const val ALL_EVENTS = MODIFY or MOVED_FROM or MOVED_TO or CREATE or DELETE
 
         /**
          * Build a Document Tree with this helper.
