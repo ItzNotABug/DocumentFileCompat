@@ -6,10 +6,20 @@ on:
     types: [ opened, synchronize, reopened ]
     paths:
       - "dfc/**"
+      - "app/**"
+      - ".github/workflows/build.yml"
+      - "*.gradle"
+      - "gradle/**"
+      - "gradle.properties"
   push:
     branches: [ master ]
     paths:
       - "dfc/**"
+      - "app/**"
+      - ".github/workflows/build.yml"
+      - "*.gradle"
+      - "gradle/**"
+      - "gradle.properties"
 
 jobs:
   build:
@@ -25,5 +35,42 @@ jobs:
           java-version: "17"
           cache: "gradle"
 
-      - name: Build DFC
-        run: ./gradlew :dfc:assemble
+      - name: Build project
+        run: ./gradlew :dfc:assemble :app:assembleDebug
+
+  instrumented-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -no-boot-anim -noaudio -no-metrics
+          script: ./gradlew :dfc:connectedDebugAndroidTest
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-reports
+          path: dfc/build/reports/androidTests/connected/
