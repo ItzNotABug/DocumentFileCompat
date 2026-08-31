@@ -19,6 +19,12 @@
         tools:ignore="AllowBackup">
 
         <activity
+            android:name=".ObserverActivity"
+            android:exported="false"
+            android:label="@string/observer_title"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"

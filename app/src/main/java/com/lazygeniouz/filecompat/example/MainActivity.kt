@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
     private lateinit var buttonDir: Button
     private lateinit var buttonFile: Button
     private lateinit var buttonProjections: Button
+    private lateinit var buttonObserver: Button
 
     private lateinit var textView: TextView
     private lateinit var progress: ProgressBar
@@ -44,6 +45,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
                         buttonDir.isVisible = false
                         buttonFile.isVisible = false
                         buttonProjections.isVisible = false
+                        buttonObserver.isVisible = false
 
                         val generationResult = TestFileGenerator.generateTestFiles(
                             this@MainActivity, documentUri, selectedFileCount
@@ -53,6 +55,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
                         buttonDir.isVisible = true
                         buttonFile.isVisible = true
                         buttonProjections.isVisible = true
+                        buttonObserver.isVisible = true
                         textView.text = generationResult
                     }
                 }
@@ -71,6 +74,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
                         buttonDir.isVisible = false
                         buttonFile.isVisible = false
                         buttonProjections.isVisible = false
+                        buttonObserver.isVisible = false
                         val performanceResult = withContext(Dispatchers.IO) {
                             Performance.calculateDirectoryPerformance(
                                 this@MainActivity, documentUri
@@ -81,6 +85,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
                         buttonDir.isVisible = true
                         buttonFile.isVisible = true
                         buttonProjections.isVisible = true
+                        buttonObserver.isVisible = true
                         textView.text = performanceResult
                     }
                 }
@@ -120,6 +125,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
                         buttonDir.isVisible = false
                         buttonFile.isVisible = false
                         buttonProjections.isVisible = false
+                        buttonObserver.isVisible = false
 
                         val performanceResult = withContext(Dispatchers.IO) {
                             Performance.calculateProjectionPerformance(
@@ -131,6 +137,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
                         buttonDir.isVisible = true
                         buttonFile.isVisible = true
                         buttonProjections.isVisible = true
+                        buttonObserver.isVisible = true
                         textView.text = performanceResult
                     }
                 }
@@ -143,6 +150,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
         buttonDir = findViewById(R.id.buttonDir)
         buttonFile = findViewById(R.id.buttonFile)
         buttonProjections = findViewById(R.id.buttonProjections)
+        buttonObserver = findViewById(R.id.buttonObserver)
         textView = findViewById(R.id.fileNames)
         progress = findViewById(R.id.progress)
 
@@ -158,6 +166,10 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
 
         buttonProjections.setOnClickListener {
             projectionResultLauncher.launch(getStorageIntent())
+        }
+
+        buttonObserver.setOnClickListener {
+            startActivity(Intent(this, ObserverActivity::class.java))
         }
     }
 
