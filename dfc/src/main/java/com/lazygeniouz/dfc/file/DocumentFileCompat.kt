@@ -238,14 +238,15 @@ abstract class DocumentFileCompat(
     }
 
     /**
-     * A directory observation created via [observe]. Start/stop operations are idempotent and
-     * thread-safe, including from inside callbacks. Also a [Closeable] ([close] == [stopWatching]).
+     * A directory observation created via [observe]. Starting and stopping are idempotent and
+     * thread-safe; [stopWatching] is safe inside callbacks. Also a [Closeable].
      */
     class Observer internal constructor(private val watcher: DirectoryWatcher) : Closeable {
 
         /**
          * Starts watching. [onReady] follows a successful baseline; [onError] reports terminal
-         * startup, permission, or directory failures. Repeated starts are ignored while active.
+         * startup, permission, or directory failures. Starts are ignored while active or until a
+         * terminal callback returns.
          */
         fun startWatching(
             onError: (Throwable) -> Unit = {},
