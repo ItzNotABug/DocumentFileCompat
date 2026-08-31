@@ -36,6 +36,9 @@ internal class WatchSession(
     // Serializes event/readiness callbacks with stopWatching().
     val callbackLock = Any()
 
+    // Set by an explicit stop that races a terminal worker-side stop.
+    val suppressTerminalCallback = AtomicBoolean(false)
+
     // Handler-less: onChange only gates + posts, no per-notification worker messages.
     val observer = object : ContentObserver(null) {
         override fun onChange(selfChange: Boolean) = onChanged(this@WatchSession)
@@ -44,6 +47,8 @@ internal class WatchSession(
     // Confined to [thread].
     var cursor: Cursor? = null
     var snapshot: LinkedHashMap<String, DocumentFileCompat> = LinkedHashMap()
+    var consecutiveRefreshFailures = 0
+    var retryGeneration = 0L
 
     private companion object {
         const val THREAD_NAME = "dfc-observer"

@@ -90,10 +90,10 @@ observer.close()
 ```
 
 Existing children do not produce events. `onReady` marks the point after which mutations are
-observable, and terminal initialization or permission failures are reported through `onError`.
+observable, and terminal initialization, permission, or directory failures use `onError`.
 Close it with the owning lifecycle. Observation is provider-driven and snapshot-based, so providers
 must publish change notifications, each refresh is Θ(children), bursts may coalesce, and
-partial/loading cursors are not supported.
+partial/loading cursors are not supported. One transient refresh retry is attempted automatically.
 
 ## Performance
 

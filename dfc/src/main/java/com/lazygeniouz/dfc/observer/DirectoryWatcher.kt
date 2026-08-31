@@ -7,6 +7,7 @@ import android.os.OperationCanceledException
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.logger.ErrorLogger
 import com.lazygeniouz.dfc.resolver.ResolverCompat
+import java.io.FileNotFoundException
 
 /**
  * Event driven watcher for the **direct children** of a SAF directory, zero polling.
@@ -31,6 +32,9 @@ internal class DirectoryWatcher(
     // Writes are guarded by [lock]; volatile reads make stale sessions no-op.
     private var session: WatchSession? = null
 
+    // A terminal session remains visible until its onError callback is completed or suppressed.
+    private var terminatingSession: WatchSession? = null
+
     private val WatchSession.isCurrent get() = this@DirectoryWatcher.session === this
 
     /** Start watching; no-op if already watching. */
@@ -39,7 +43,7 @@ internal class DirectoryWatcher(
         onReady: () -> Unit,
     ) {
         synchronized(lock) {
-            if (session != null) return
+            if (session != null || terminatingSession != null) return
             val started = WatchSession(::scheduleRefresh, onError, onReady)
             session = started
             started.handler.post { initialize(started) }
@@ -49,14 +53,30 @@ internal class DirectoryWatcher(
     /** Stop watching & release the session's cursor + worker thread; no-op if not watching. */
     internal fun stopWatching() {
         val stopped: WatchSession
+        val teardownRequired: Boolean
         synchronized(lock) {
-            stopped = session ?: return
-            session = null
+            val active = session
+            if (active != null) {
+                stopped = active
+                session = null
+                teardownRequired = true
+            } else {
+                stopped = terminatingSession ?: return
+                teardownRequired = false
+            }
+            stopped.suppressTerminalCallback.set(true)
         }
         stopped.cancellationSignal.cancel()
-        // An admitted callback finishes before stop returns; future ones see a stale session.
+        // An admitted callback finishes before stop returns; a pending terminal callback is skipped.
         synchronized(stopped.callbackLock) {}
-        stopped.handler.post { teardown(stopped) }
+        if (teardownRequired) {
+            stopped.handler.post { teardown(stopped) }
+        } else {
+            // The old worker may still be cleaning up, but can no longer call user code.
+            synchronized(lock) {
+                if (terminatingSession === stopped) terminatingSession = null
+            }
+        }
     }
 
     private fun scheduleRefresh(session: WatchSession) {
@@ -87,12 +107,14 @@ internal class DirectoryWatcher(
 
     private fun doInitialize(session: WatchSession) {
         val cursor = query(session)
-            ?: throw IllegalStateException("The provider returned no directory cursor")
+            ?: throw FileNotFoundException("The provider returned no directory cursor")
 
         var attached = false
         try {
+            session.cancellationSignal.throwIfCanceled()
             cursor.registerContentObserver(session.observer)
             val baseline = readSnapshot(session, cursor)
+            ensureDirectoryAvailable(session, baseline)
             session.cancellationSignal.throwIfCanceled()
             if (!session.isCurrent) return
 
@@ -101,7 +123,8 @@ internal class DirectoryWatcher(
             attached = true
 
             // A second snapshot closes the pre-registration blind window before readiness.
-            val startupEvents = reconcileBeforeReady(session)
+            // Failure is terminal: readiness must never be reported with a stale baseline.
+            val startupEvents = refreshOnce(session, deliverEvents = false)
             if (!session.isCurrent) return
             emitReady(session)
             for (event in startupEvents) {
@@ -117,29 +140,20 @@ internal class DirectoryWatcher(
         if (!session.isCurrent) return
         try {
             refreshOnce(session)
+            session.consecutiveRefreshFailures = 0
+            session.retryGeneration++
         } catch (cancelled: OperationCanceledException) {
             if (session.isCurrent) {
-                ErrorLogger.logError("Directory refresh was cancelled, keeping the watch", cancelled)
+                logTransientFailure(session, "Directory refresh was cancelled", cancelled)
             }
         } catch (security: SecurityException) {
             ErrorLogger.logError("Permission revoked, releasing the observer", security)
             stopSelf(session, security)
+        } catch (unavailable: FileNotFoundException) {
+            ErrorLogger.logError("Observed directory is no longer available", unavailable)
+            stopSelf(session, unavailable)
         } catch (exception: Exception) {
-            ErrorLogger.logError("Directory refresh failed, keeping the existing watch", exception)
-        }
-    }
-
-    private fun reconcileBeforeReady(session: WatchSession): List<SnapshotDiffer.DiffEvent> {
-        return try {
-            refreshOnce(session, deliverEvents = false)
-        } catch (cancelled: OperationCanceledException) {
-            throw cancelled
-        } catch (security: SecurityException) {
-            throw security
-        } catch (exception: Exception) {
-            // The initial cursor is already active; a transient reconciliation failure is safe.
-            ErrorLogger.logError("Initial reconciliation failed, keeping the existing watch", exception)
-            emptyList()
+            logTransientFailure(session, "Directory refresh failed", exception)
         }
     }
 
@@ -151,13 +165,15 @@ internal class DirectoryWatcher(
         val previousCursor = session.cursor ?: return emptyList()
 
         val freshCursor = query(session)
-            ?: throw IllegalStateException("The provider returned no directory cursor")
+            ?: throw FileNotFoundException("The provider returned no directory cursor")
 
         var promoted = false
         try {
+            session.cancellationSignal.throwIfCanceled()
             // Observe the fresh cursor BEFORE reading it & BEFORE closing the previous one.
             freshCursor.registerContentObserver(session.observer)
             val freshSnapshot = readSnapshot(session, freshCursor)
+            ensureDirectoryAvailable(session, freshSnapshot)
             session.cancellationSignal.throwIfCanceled()
             if (!session.isCurrent) return emptyList()
 
@@ -196,7 +212,7 @@ internal class DirectoryWatcher(
         return synchronized(session.callbackLock) {
             if (!session.isCurrent) return@synchronized false
             try {
-                listener(diffEvent.event, diffEvent.document)
+                listener(diffEvent.event, ResolverCompat.copyForCallback(diffEvent.document))
             } catch (exception: Exception) {
                 ErrorLogger.logError("Observer listener threw an exception", exception)
             }
@@ -228,19 +244,64 @@ internal class DirectoryWatcher(
         }
     }
 
+    private fun ensureDirectoryAvailable(
+        session: WatchSession,
+        snapshot: Map<String, DocumentFileCompat>,
+    ) {
+        if (snapshot.isEmpty() && !ResolverCompat.isExistingDirectory(
+                directory.context,
+                directory.uri,
+                session.cancellationSignal,
+            )
+        ) {
+            throw FileNotFoundException("The observed directory no longer exists")
+        }
+    }
+
+    private fun logTransientFailure(
+        session: WatchSession,
+        message: String,
+        failure: Exception,
+    ) {
+        val retryScheduled = scheduleRetryAfterFailure(session)
+        val outcome = if (retryScheduled) "retrying once" else "waiting for the next change"
+        ErrorLogger.logError("$message; $outcome", failure)
+    }
+
+    private fun scheduleRetryAfterFailure(session: WatchSession): Boolean {
+        val failureCount = ++session.consecutiveRefreshFailures
+        val generation = ++session.retryGeneration
+        if (failureCount > MAX_AUTOMATIC_REFRESH_RETRIES || !session.isCurrent) return false
+
+        return session.handler.postDelayed({
+            if (session.isCurrent && session.retryGeneration == generation) {
+                scheduleRefresh(session)
+            }
+        }, REFRESH_RETRY_DELAY_MS)
+    }
+
     // Worker-side stop for unrecoverable start failures; loses to an already issued stop.
     private fun stopSelf(session: WatchSession, failure: Throwable) {
         synchronized(lock) {
             if (!session.isCurrent) return
             this.session = null
+            terminatingSession = session
         }
         session.cancellationSignal.cancel()
-        teardown(session)
-        synchronized(session.callbackLock) {
-            try {
-                session.onError(failure)
-            } catch (exception: Exception) {
-                ErrorLogger.logError("Observer error callback threw an exception", exception)
+        try {
+            teardown(session)
+            synchronized(session.callbackLock) {
+                if (!session.suppressTerminalCallback.get()) {
+                    try {
+                        session.onError(failure)
+                    } catch (exception: Exception) {
+                        ErrorLogger.logError("Observer error callback threw an exception", exception)
+                    }
+                }
+            }
+        } finally {
+            synchronized(lock) {
+                if (terminatingSession === session) terminatingSession = null
             }
         }
     }
@@ -266,5 +327,10 @@ internal class DirectoryWatcher(
             cursor.close()
         } catch (_: Exception) {
         }
+    }
+
+    private companion object {
+        const val MAX_AUTOMATIC_REFRESH_RETRIES = 1
+        const val REFRESH_RETRY_DELAY_MS = 200L
     }
 }

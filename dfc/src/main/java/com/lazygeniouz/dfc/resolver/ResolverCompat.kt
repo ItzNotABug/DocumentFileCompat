@@ -163,7 +163,10 @@ internal object ResolverCompat {
         reusable: Map<String, DocumentFileCompat>,
         cancellationSignal: CancellationSignal,
     ): LinkedHashMap<String, DocumentFileCompat> {
-        val snapshot = LinkedHashMap<String, DocumentFileCompat>(mapCapacity(cursor.count))
+        cancellationSignal.throwIfCanceled()
+        val itemCount = cursor.count
+        cancellationSignal.throwIfCanceled()
+        val snapshot = LinkedHashMap<String, DocumentFileCompat>(mapCapacity(itemCount))
         forEachChild(
             context, cursor, parent, reusable, cancellationSignal, strictIds = true
         ) { documentId, child ->
@@ -172,6 +175,44 @@ internal object ResolverCompat {
             }
         }
         return snapshot
+    }
+
+    /** Query the watched document itself when an empty child cursor cannot prove it still exists. */
+    internal fun isExistingDirectory(
+        context: Context,
+        uri: Uri,
+        cancellationSignal: CancellationSignal,
+    ): Boolean {
+        cancellationSignal.throwIfCanceled()
+        val cursor = context.contentResolver.query(
+            uri,
+            arrayOf(Document.COLUMN_MIME_TYPE),
+            null, null, null,
+            cancellationSignal,
+        ) ?: return false
+
+        return cursor.use {
+            cancellationSignal.throwIfCanceled()
+            val mimeIndex = it.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE)
+            it.moveToFirst() && getStringOrDefault(it, mimeIndex) == Document.MIME_TYPE_DIR
+        }
+    }
+
+    /** Event payloads must not expose the mutable objects retained by the internal snapshot. */
+    internal fun copyForCallback(document: DocumentFileCompat): DocumentFileCompat {
+        val copy: DocumentFileCompat = if (document.documentMimeType == Document.MIME_TYPE_DIR) {
+            TreeDocumentFileCompat(
+                document.context, document.uri, document.name, document.length,
+                document.lastModified, document.documentMimeType, document.documentFlags,
+            )
+        } else {
+            SingleDocumentFileCompat(
+                document.context, document.uri, document.name, document.length,
+                document.lastModified, document.documentMimeType, document.documentFlags,
+            )
+        }
+        copy.parentFile = document.parentFile
+        return copy
     }
 
     private inline fun forEachChild(

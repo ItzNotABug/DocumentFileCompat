@@ -212,25 +212,14 @@ abstract class DocumentFileCompat(
     }
 
     /**
-     * Observe the **direct children** of this directory for changes, without polling —
-     * the SAF equivalent of [FileObserver].
+     * Creates a stopped [Observer] for this SAF directory's direct children.
      *
-     * The returned [Observer] is **not started**; call [Observer.startWatching] to begin &
-     * [Observer.stopWatching] when done (an unstopped observer leaks a cursor & a thread).
-     * Existing children emit no events & callbacks run on the observer's worker thread.
-     * Events are net snapshot changes, so rapid intermediate states can coalesce. Each refresh
-     * scans all direct children, and providers that return partial/loading cursors are unsupported.
-     *
-     * Event constants alias [FileObserver]'s bit values, unsupported bits in the [mask] are
-     * ignored. A same-id rename emits [MOVED_FROM] (old name) then [MOVED_TO] (new name); an
-     * id-changing rename surfaces as [DELETE] + [CREATE]. [MODIFY] is best-effort & providers
-     * that don't publish change notifications cannot be observed.
+     * Existing children emit no events. Changes may coalesce between provider notifications,
+     * and callbacks run on a worker thread with detached document snapshots.
      *
      * @param mask Bitwise OR of the events to receive, [ALL_EVENTS] by default.
-     * @param listener Called with the event & the affected [DocumentFileCompat].
-     *
-     * @throws UnsupportedOperationException if this document is not a SAF backed directory.
-     * @throws IllegalArgumentException if the [mask] contains no supported event.
+     * @throws UnsupportedOperationException if this is not a SAF-backed directory.
+     * @throws IllegalArgumentException if [mask] contains no supported event.
      */
     fun observe(
         mask: Int = ALL_EVENTS,
@@ -255,12 +244,8 @@ abstract class DocumentFileCompat(
     class Observer internal constructor(private val watcher: DirectoryWatcher) : Closeable {
 
         /**
-         * Starts a new observation session.
-         *
-         * [onReady] runs once the initial snapshot is installed; mutations made after it begins
-         * are observable. [onError] runs only when that session stops because of a terminal
-         * initialization or permission failure. Both callbacks run on the observer worker.
-         * Calls made while already started are ignored, including their callbacks.
+         * Starts watching. [onReady] follows a successful baseline; [onError] reports terminal
+         * startup, permission, or directory failures. Repeated starts are ignored while active.
          */
         fun startWatching(
             onError: (Throwable) -> Unit = {},
@@ -268,7 +253,7 @@ abstract class DocumentFileCompat(
         ) = watcher.startWatching(onError, onReady)
 
         /**
-         * Invalidates the session and prevents further event callbacks before returning. Cleanup
+         * Invalidates the session and prevents further callbacks before returning. Cleanup
          * then completes on the worker after any provider operation already in flight returns.
          */
         fun stopWatching() = watcher.stopWatching()
