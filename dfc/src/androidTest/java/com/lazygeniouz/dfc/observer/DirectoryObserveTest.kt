@@ -191,6 +191,48 @@ class DirectoryObserveTest {
     }
 
     @Test
+    fun callbackRename_cannotMutateTheInternalSnapshotDocument() {
+        val callbackEvents = LinkedBlockingQueue<Triple<Int, String, String>>()
+        val renameFinished = CountDownLatch(1)
+        val renameSucceeded = AtomicReference<Boolean?>()
+        val callbackObserver = directory.observe { event, document ->
+            callbackEvents.add(
+                Triple(event, document.name, DocumentsContract.getDocumentId(document.uri))
+            )
+            if (event == DocumentFileCompat.CREATE && document.name == "callback.txt") {
+                renameSucceeded.set(document.renameTo("renamed.txt"))
+                renameFinished.countDown()
+            }
+        }.also { observer = it }
+        startAndAwaitWatching(callbackObserver)
+
+        createFile("callback.txt")
+        notifyChildren()
+
+        assertTrue("Callback rename did not finish", renameFinished.await(5, TimeUnit.SECONDS))
+        assertEquals(true, renameSucceeded.get())
+        val first = callbackEvents.poll(5, TimeUnit.SECONDS)
+            ?: throw AssertionError("Missing original CREATE event")
+        val second = callbackEvents.poll(5, TimeUnit.SECONDS)
+            ?: throw AssertionError("Missing DELETE event after rename")
+        val third = callbackEvents.poll(5, TimeUnit.SECONDS)
+            ?: throw AssertionError("Missing CREATE event after rename")
+
+        assertEquals(
+            Triple(DocumentFileCompat.CREATE, "callback.txt", "${TestDocumentsProvider.ROOT_ID}/callback.txt"),
+            first,
+        )
+        assertEquals(
+            Triple(DocumentFileCompat.DELETE, "callback.txt", "${TestDocumentsProvider.ROOT_ID}/callback.txt"),
+            second,
+        )
+        assertEquals(
+            Triple(DocumentFileCompat.CREATE, "renamed.txt", "${TestDocumentsProvider.ROOT_ID}/renamed.txt"),
+            third,
+        )
+    }
+
+    @Test
     fun maskFiltering_suppressesUnrequestedEvents() {
         val victim = createFile("victim.txt")
         val deleteOnly = observe(DocumentFileCompat.DELETE)

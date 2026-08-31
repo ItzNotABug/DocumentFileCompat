@@ -10,6 +10,7 @@ import android.provider.DocumentsContract.Document
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
 import java.io.File
+import java.io.FileNotFoundException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -25,7 +26,7 @@ class TestDocumentsProvider : DocumentsProvider() {
     override fun onCreate(): Boolean = true
 
     private val baseDir: File
-        get() = File(context!!.filesDir, ROOT_ID).apply { mkdirs() }
+        get() = File(context!!.filesDir, ROOT_ID)
 
     private fun fileFor(documentId: String): File {
         if (documentId == ROOT_ID) return baseDir
@@ -46,10 +47,15 @@ class TestDocumentsProvider : DocumentsProvider() {
         projection: Array<out String>?,
         sortOrder: String?,
     ): Cursor {
-        childQueryCount.incrementAndGet()
+        val queryNumber = childQueryCount.incrementAndGet()
         childQueryGate?.await(10, TimeUnit.SECONDS)
         if (revokePermissions) throw SecurityException("Permission revoked (test)")
-        if (failChildQueries) {
+        if (failChildQueriesWithFileNotFound) {
+            failedChildQueries.incrementAndGet()
+            throw FileNotFoundException("Directory unavailable (test)")
+        }
+        if (failChildQueryAt == queryNumber || consumeNextChildQueryFailure() || failChildQueries) {
+            if (failChildQueryAt == queryNumber) failChildQueryAt = null
             failedChildQueries.incrementAndGet()
             throw IllegalStateException("Transient failure (test)")
         }
@@ -65,6 +71,20 @@ class TestDocumentsProvider : DocumentsProvider() {
         childSnapshotCaptured?.countDown()
         childQueryReturnGate?.await(10, TimeUnit.SECONDS)
         return cursor
+    }
+
+    override fun renameDocument(documentId: String, displayName: String): String {
+        val source = fileFor(documentId)
+        val parent = source.parentFile
+            ?: throw FileNotFoundException("Document has no parent: $documentId")
+        val target = File(parent, displayName)
+        if (!source.renameTo(target)) {
+            throw FileNotFoundException("Could not rename $documentId")
+        }
+
+        val parentDocumentId = documentId.substringBeforeLast('/', ROOT_ID)
+        context!!.contentResolver.notifyChange(childrenUriOf(parentDocumentId), null)
+        return "$parentDocumentId/${target.name}"
     }
 
     /** Child cursor with failure injection and close accounting. */
@@ -87,6 +107,8 @@ class TestDocumentsProvider : DocumentsProvider() {
         }
 
         override fun close() {
+            childCursorCloseStarted?.countDown()
+            childCursorCloseGate?.await(10, TimeUnit.SECONDS)
             if (closedOnce.compareAndSet(false, true)) closedChildCursors.incrementAndGet()
             super.close()
         }
@@ -139,6 +161,12 @@ class TestDocumentsProvider : DocumentsProvider() {
         var failChildQueries = false
 
         @Volatile
+        var failChildQueriesWithFileNotFound = false
+
+        @Volatile
+        var failChildQueryAt: Int? = null
+
+        @Volatile
         var revokePermissions = false
 
         @Volatile
@@ -156,13 +184,23 @@ class TestDocumentsProvider : DocumentsProvider() {
         @Volatile
         var childQueryReturnGate: CountDownLatch? = null
 
+        @Volatile
+        var childCursorCloseStarted: CountDownLatch? = null
+
+        @Volatile
+        var childCursorCloseGate: CountDownLatch? = null
+
         val childQueryCount = AtomicInteger(0)
         val failedChildQueries = AtomicInteger(0)
+        val failNextChildQueries = AtomicInteger(0)
         val openChildCursors = AtomicInteger(0)
         val closedChildCursors = AtomicInteger(0)
 
         fun resetTestControls() {
             failChildQueries = false
+            failChildQueriesWithFileNotFound = false
+            failChildQueryAt = null
+            failNextChildQueries.set(0)
             revokePermissions = false
             revokeDuringMaterialization = false
             failObserverRegistration = false
@@ -170,7 +208,18 @@ class TestDocumentsProvider : DocumentsProvider() {
             childQueryGate = null
             childQueryReturnGate?.countDown()
             childQueryReturnGate = null
+            childCursorCloseGate?.countDown()
+            childCursorCloseGate = null
+            childCursorCloseStarted = null
             childSnapshotCaptured = null
+        }
+
+        private fun consumeNextChildQueryFailure(): Boolean {
+            while (true) {
+                val remaining = failNextChildQueries.get()
+                if (remaining <= 0) return false
+                if (failNextChildQueries.compareAndSet(remaining, remaining - 1)) return true
+            }
         }
 
         fun childrenUriOf(parentDocumentId: String) =

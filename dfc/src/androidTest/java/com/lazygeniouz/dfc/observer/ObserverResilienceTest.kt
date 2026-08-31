@@ -17,9 +17,11 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.FileNotFoundException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
@@ -198,6 +200,44 @@ class ObserverResilienceTest {
     }
 
     @Test
+    fun startupReconciliationFailure_neverReportsReady() {
+        val snapshotCaptured = CountDownLatch(1)
+        val returnGate = CountDownLatch(1)
+        TestDocumentsProvider.childSnapshotCaptured = snapshotCaptured
+        TestDocumentsProvider.childQueryReturnGate = returnGate
+
+        val started = observe()
+        val completed = CountDownLatch(1)
+        val becameReady = AtomicBoolean(false)
+        val failure = AtomicReference<Throwable?>()
+        started.startWatching(
+            onError = {
+                failure.set(it)
+                completed.countDown()
+            },
+            onReady = {
+                becameReady.set(true)
+                completed.countDown()
+            },
+        )
+
+        assertTrue("Initial snapshot was not captured", snapshotCaptured.await(5, TimeUnit.SECONDS))
+        createFile("blind-window.txt")
+        notifyChildren() // No observer is registered yet; this notification is deliberately lost.
+        TestDocumentsProvider.failChildQueryAt = TestDocumentsProvider.childQueryCount.get() + 1
+
+        returnGate.countDown()
+        TestDocumentsProvider.childQueryReturnGate = null
+        TestDocumentsProvider.childSnapshotCaptured = null
+
+        assertTrue("Startup did not terminate", completed.await(5, TimeUnit.SECONDS))
+        assertFalse("A stale baseline was reported ready", becameReady.get())
+        assertTrue(failure.get() is IllegalStateException)
+        awaitObserverThreadGone()
+        awaitAllChildCursorsClosed()
+    }
+
+    @Test
     fun registrationRevocation_reportsErrorAndReleasesSession() {
         TestDocumentsProvider.failObserverRegistration = true
 
@@ -228,6 +268,53 @@ class ObserverResilienceTest {
             ),
             setOf(requireEvent(), requireEvent())
         )
+    }
+
+    @Test
+    fun oneShotRefreshFailure_retriesWithoutAnotherNotification() {
+        startAndAwaitWatching(observe())
+
+        val failedBaseline = TestDocumentsProvider.failedChildQueries.get()
+        val queryBaseline = TestDocumentsProvider.childQueryCount.get()
+        TestDocumentsProvider.failNextChildQueries.set(1)
+        createFile("retried.txt")
+        notifyChildren()
+
+        awaitCounterAbove(TestDocumentsProvider.failedChildQueries, failedBaseline)
+        assertEquals(DocumentFileCompat.CREATE to "retried.txt", requireEvent())
+        assertTrue(TestDocumentsProvider.childQueryCount.get() - queryBaseline >= 2)
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    fun nullRefreshCursor_isTerminalAndAllowsRestart() {
+        startAndAwaitWatching(observe())
+
+        TestDocumentsProvider.failChildQueriesWithFileNotFound = true
+        notifyChildren()
+
+        assertTrue(errors.poll(5, TimeUnit.SECONDS) is FileNotFoundException)
+        awaitObserverThreadGone()
+        awaitAllChildCursorsClosed()
+
+        TestDocumentsProvider.failChildQueriesWithFileNotFound = false
+        startAndAwaitWatching(observer!!)
+    }
+
+    @Test
+    fun watchedDirectoryDeletion_isTerminalAndAllowsRestart() {
+        createFile("existing.txt")
+        startAndAwaitWatching(observe())
+
+        assertTrue(backingDir.deleteRecursively())
+        notifyChildren()
+
+        assertTrue(errors.poll(5, TimeUnit.SECONDS) is FileNotFoundException)
+        awaitObserverThreadGone()
+        awaitAllChildCursorsClosed()
+
+        assertTrue(backingDir.mkdirs())
+        startAndAwaitWatching(observer!!)
     }
 
     @Test
@@ -318,6 +405,63 @@ class ObserverResilienceTest {
         createFile("recovered-materialization.txt")
         notifyChildren()
         assertEquals(DocumentFileCompat.CREATE to "recovered-materialization.txt", requireEvent())
+    }
+
+    @Test
+    fun stopDuringTerminalCallback_waitsUntilTheCallbackFinishes() {
+        val callbackEntered = CountDownLatch(1)
+        val releaseCallback = CountDownLatch(1)
+        val stopReturned = CountDownLatch(1)
+        val terminal = directory.observe { _, _ -> }.also { observer = it }
+        val ready = CountDownLatch(1)
+        terminal.startWatching(
+            onError = {
+                callbackEntered.countDown()
+                releaseCallback.await(5, TimeUnit.SECONDS)
+            },
+            onReady = ready::countDown,
+        )
+        assertTrue("Observer did not become ready", ready.await(5, TimeUnit.SECONDS))
+
+        TestDocumentsProvider.revokePermissions = true
+        notifyChildren()
+        assertTrue("Terminal callback was not admitted", callbackEntered.await(5, TimeUnit.SECONDS))
+
+        val stopper = Thread {
+            terminal.stopWatching()
+            stopReturned.countDown()
+        }.apply { start() }
+        assertFalse("Stop returned while onError was running", stopReturned.await(200, TimeUnit.MILLISECONDS))
+
+        releaseCallback.countDown()
+        assertTrue("Stop did not return after onError", stopReturned.await(5, TimeUnit.SECONDS))
+        stopper.join(5000)
+        awaitObserverThreadGone()
+        awaitAllChildCursorsClosed()
+    }
+
+    @Test
+    fun stopBeforeTerminalCallback_suppressesTheCallback() {
+        startAndAwaitWatching(observe())
+
+        val closeStarted = CountDownLatch(1)
+        val closeGate = CountDownLatch(1)
+        TestDocumentsProvider.childCursorCloseStarted = closeStarted
+        TestDocumentsProvider.childCursorCloseGate = closeGate
+
+        TestDocumentsProvider.revokePermissions = true
+        notifyChildren()
+        assertTrue("Terminal cleanup did not begin", closeStarted.await(5, TimeUnit.SECONDS))
+
+        observer?.stopWatching()
+        assertTrue("onError ran before stop returned", errors.isEmpty())
+
+        closeGate.countDown()
+        TestDocumentsProvider.childCursorCloseGate = null
+        TestDocumentsProvider.childCursorCloseStarted = null
+        awaitObserverThreadGone()
+        awaitAllChildCursorsClosed()
+        assertNull("onError ran after stop returned", errors.poll(250, TimeUnit.MILLISECONDS))
     }
 
     @Test
