@@ -377,18 +377,48 @@ class ObserverResilienceTest {
     }
 
     @Test
-    fun nullRefreshCursor_isTerminalAndAllowsRestart() {
+    fun nullRefreshCursor_isRecoverableAndReconcilesMissedChanges() {
         startAndAwaitWatching(observe())
 
-        TestDocumentsProvider.failChildQueriesWithFileNotFound = true
+        val queryBaseline = TestDocumentsProvider.childQueryCount.get()
+        TestDocumentsProvider.returnNullChildQueries = true
+        createFile("missed-null-cursor.txt")
         notifyChildren()
 
-        assertTrue(errors.poll(5, TimeUnit.SECONDS) is FileNotFoundException)
-        awaitObserverThreadGone()
-        awaitAllChildCursorsClosed()
+        awaitQueryDelta(queryBaseline, 2)
+        assertTrue(errors.isEmpty())
+        assertTrue(observerThreadAlive())
+        assertNull(events.poll(250, TimeUnit.MILLISECONDS))
 
-        TestDocumentsProvider.failChildQueriesWithFileNotFound = false
-        startAndAwaitWatching(observer!!)
+        TestDocumentsProvider.returnNullChildQueries = false
+        notifyChildren()
+
+        assertEquals(
+            DirectoryObserver.CREATE to "missed-null-cursor.txt",
+            requireEvent(),
+        )
+    }
+
+    @Test
+    fun nullDirectoryCheckCursor_isRecoverable() {
+        startAndAwaitWatching(observe())
+
+        val queryBaseline = TestDocumentsProvider.childQueryCount.get()
+        TestDocumentsProvider.returnNullDocumentQueries = true
+        notifyChildren()
+
+        awaitQueryDelta(queryBaseline, 2)
+        assertTrue(errors.isEmpty())
+        assertTrue(observerThreadAlive())
+
+        TestDocumentsProvider.returnNullDocumentQueries = false
+        createFile("after-null-directory-check.txt")
+        notifyChildren()
+
+        assertEquals(
+            DirectoryObserver.CREATE to "after-null-directory-check.txt",
+            requireEvent(),
+        )
     }
 
     @Test

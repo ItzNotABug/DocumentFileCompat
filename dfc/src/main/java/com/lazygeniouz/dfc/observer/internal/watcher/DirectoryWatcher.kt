@@ -15,6 +15,7 @@ import com.lazygeniouz.dfc.observer.internal.snapshot.SnapshotDiffer
 import com.lazygeniouz.dfc.observer.internal.snapshot.SnapshotScan
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 import java.io.FileNotFoundException
+import java.io.IOException
 
 /**
  * Event driven watcher for the **direct children** of a SAF directory, zero polling.
@@ -113,7 +114,7 @@ internal class DirectoryWatcher(
 
     private fun doInitialize(session: WatchSession) {
         val cursor = query(session, ResolverCompat.fullProjection)
-            ?: throw FileNotFoundException("The provider returned no directory cursor")
+            ?: throw IOException("The provider returned no directory cursor")
 
         var attached = false
         try {
@@ -177,7 +178,7 @@ internal class DirectoryWatcher(
 
     private fun resumeInitialization(session: WatchSession): Boolean {
         val cursor = query(session, ResolverCompat.fullProjection)
-            ?: throw FileNotFoundException("The provider returned no directory cursor")
+            ?: throw IOException("The provider returned no directory cursor")
 
         try {
             session.cancellationSignal.throwIfCanceled()
@@ -205,7 +206,7 @@ internal class DirectoryWatcher(
         if (session.lightweightCursorInstalled) return
 
         val cursor = query(session, ResolverCompat.notificationProjection)
-            ?: throw FileNotFoundException("The provider returned no notification cursor")
+            ?: throw IOException("The provider returned no notification cursor")
 
         var attached = false
         try {
@@ -245,7 +246,7 @@ internal class DirectoryWatcher(
         if (session.notificationCursor == null) return emptyList()
 
         val freshCursor = query(session, ResolverCompat.fullProjection)
-            ?: throw FileNotFoundException("The provider returned no directory cursor")
+            ?: throw IOException("The provider returned no directory cursor")
 
         try {
             session.cancellationSignal.throwIfCanceled()

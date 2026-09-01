@@ -13,6 +13,7 @@ import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import com.lazygeniouz.dfc.logger.ErrorLogger
 import com.lazygeniouz.dfc.observer.internal.snapshot.ChildState
 import com.lazygeniouz.dfc.observer.internal.snapshot.SnapshotScan
+import java.io.IOException
 
 /**
  * Helper class for calling relevant methods on [DocumentsContract] & queries via [ContentResolver].
@@ -214,7 +215,7 @@ internal object ResolverCompat {
             arrayOf(Document.COLUMN_MIME_TYPE),
             null, null, null,
             cancellationSignal,
-        ) ?: return false
+        ) ?: throw IOException("The provider returned no document cursor")
 
         return cursor.use {
             cancellationSignal.throwIfCanceled()

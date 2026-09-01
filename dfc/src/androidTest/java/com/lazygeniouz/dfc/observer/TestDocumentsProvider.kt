@@ -37,7 +37,8 @@ class TestDocumentsProvider : DocumentsProvider() {
     override fun queryRoots(projection: Array<out String>?): Cursor =
         MatrixCursor(projection ?: arrayOf(Root.COLUMN_ROOT_ID))
 
-    override fun queryDocument(documentId: String, projection: Array<out String>?): Cursor {
+    override fun queryDocument(documentId: String, projection: Array<out String>?): Cursor? {
+        if (returnNullDocumentQueries) return null
         return MatrixCursor(resolve(projection)).also { cursor ->
             include(cursor, documentId, fileFor(documentId))
         }
@@ -47,19 +48,16 @@ class TestDocumentsProvider : DocumentsProvider() {
         parentDocumentId: String,
         projection: Array<out String>?,
         sortOrder: String?,
-    ): Cursor {
+    ): Cursor? {
         val queryNumber = childQueryCount.incrementAndGet()
         childQueryGate?.await(10, TimeUnit.SECONDS)
         if (revokePermissions) throw SecurityException("Permission revoked (test)")
-        if (failChildQueriesWithFileNotFound) {
-            failedChildQueries.incrementAndGet()
-            throw FileNotFoundException("Directory unavailable (test)")
-        }
         if (failChildQueryAt == queryNumber || consumeNextChildQueryFailure() || failChildQueries) {
             if (failChildQueryAt == queryNumber) failChildQueryAt = null
             failedChildQueries.incrementAndGet()
             throw IllegalStateException("Transient failure (test)")
         }
+        if (returnNullChildQueries) return null
 
         val columns = resolve(projection)
         val loading = returnLoadingChildren
@@ -183,9 +181,6 @@ class TestDocumentsProvider : DocumentsProvider() {
         var failChildQueries = false
 
         @Volatile
-        var failChildQueriesWithFileNotFound = false
-
-        @Volatile
         var failChildQueryAt: Int? = null
 
         @Volatile
@@ -196,6 +191,12 @@ class TestDocumentsProvider : DocumentsProvider() {
 
         @Volatile
         var failObserverRegistration = false
+
+        @Volatile
+        var returnNullChildQueries = false
+
+        @Volatile
+        var returnNullDocumentQueries = false
 
         @Volatile
         var returnLoadingChildren = false
@@ -228,12 +229,13 @@ class TestDocumentsProvider : DocumentsProvider() {
 
         fun resetTestControls() {
             failChildQueries = false
-            failChildQueriesWithFileNotFound = false
             failChildQueryAt = null
             failNextChildQueries.set(0)
             revokePermissions = false
             revokeDuringMaterialization = false
             failObserverRegistration = false
+            returnNullChildQueries = false
+            returnNullDocumentQueries = false
             returnLoadingChildren = false
             loadingChildLimit = 1
             childQueryGate?.countDown()
