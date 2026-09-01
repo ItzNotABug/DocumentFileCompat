@@ -17,6 +17,7 @@ import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.observer.DirectoryObserver
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,7 +49,7 @@ class ObserverActivity : AppCompatActivity(R.layout.activity_observer) {
 
     private var directoryUri: Uri? = null
     private var directory: DocumentFileCompat? = null
-    private var observer: DocumentFileCompat.Observer? = null
+    private var observer: DirectoryObserver? = null
     private var openingJob: Job? = null
     private var demoJob: Job? = null
     private var openingDirectory = false
@@ -404,11 +405,11 @@ class ObserverActivity : AppCompatActivity(R.layout.activity_observer) {
     private fun timestamp(): String = timestampFormatter.format(Date())
 
     private fun eventName(event: Int): String = when (event) {
-        DocumentFileCompat.CREATE -> "CREATE"
-        DocumentFileCompat.DELETE -> "DELETE"
-        DocumentFileCompat.MODIFY -> "MODIFY"
-        DocumentFileCompat.MOVED_FROM -> "MOVED_FROM"
-        DocumentFileCompat.MOVED_TO -> "MOVED_TO"
+        DirectoryObserver.CREATE -> "CREATE"
+        DirectoryObserver.DELETE -> "DELETE"
+        DirectoryObserver.MODIFY -> "MODIFY"
+        DirectoryObserver.MOVED_FROM -> "MOVED_FROM"
+        DirectoryObserver.MOVED_TO -> "MOVED_TO"
         else -> "0x${event.toString(16)}"
     }
 

@@ -37,7 +37,7 @@ class ObserverResilienceTest {
 
     private val events = LinkedBlockingQueue<Pair<Int, String>>()
     private val errors = LinkedBlockingQueue<Throwable>()
-    private var observer: DocumentFileCompat.Observer? = null
+    private var observer: DirectoryObserver? = null
     private var openedCursorBaseline = 0
     private var closedCursorBaseline = 0
 
@@ -63,7 +63,7 @@ class ObserverResilienceTest {
         backingDir.deleteRecursively()
     }
 
-    private fun observe(): DocumentFileCompat.Observer {
+    private fun observe(): DirectoryObserver {
         return directory.observe { event, document ->
             events.add(event to document.name)
         }.also { observer = it }
@@ -82,7 +82,7 @@ class ObserverResilienceTest {
         events.poll(timeoutMs, TimeUnit.MILLISECONDS)
             ?: fail("Timed out waiting for an event").let { throw AssertionError() }
 
-    private fun startAndAwaitWatching(started: DocumentFileCompat.Observer) {
+    private fun startAndAwaitWatching(started: DirectoryObserver) {
         val completed = CountDownLatch(1)
         val failure = AtomicReference<Throwable?>()
         started.startWatching(
@@ -97,7 +97,7 @@ class ObserverResilienceTest {
         failure.get()?.let { throw AssertionError("Observer failed to start", it) }
     }
 
-    private fun startAndAwaitFailure(started: DocumentFileCompat.Observer): Throwable {
+    private fun startAndAwaitFailure(started: DirectoryObserver): Throwable {
         val completed = CountDownLatch(1)
         val failure = AtomicReference<Throwable?>()
         val becameReady = AtomicReference(false)
@@ -183,7 +183,7 @@ class ObserverResilienceTest {
         startAndAwaitWatching(observer!!)
         createFile("recovered.txt")
         notifyChildren()
-        assertEquals(DocumentFileCompat.CREATE to "recovered.txt", requireEvent())
+        assertEquals(DirectoryObserver.CREATE to "recovered.txt", requireEvent())
     }
 
     @Test
@@ -263,8 +263,8 @@ class ObserverResilienceTest {
 
         assertEquals(
             setOf(
-                DocumentFileCompat.CREATE to "missed.txt",
-                DocumentFileCompat.CREATE to "caught.txt",
+                DirectoryObserver.CREATE to "missed.txt",
+                DirectoryObserver.CREATE to "caught.txt",
             ),
             setOf(requireEvent(), requireEvent())
         )
@@ -281,7 +281,7 @@ class ObserverResilienceTest {
         notifyChildren()
 
         awaitCounterAbove(TestDocumentsProvider.failedChildQueries, failedBaseline)
-        assertEquals(DocumentFileCompat.CREATE to "retried.txt", requireEvent())
+        assertEquals(DirectoryObserver.CREATE to "retried.txt", requireEvent())
         assertTrue(TestDocumentsProvider.childQueryCount.get() - queryBaseline >= 2)
         assertTrue(errors.isEmpty())
     }
@@ -338,9 +338,9 @@ class ObserverResilienceTest {
 
         assertEquals(
             setOf(
-                DocumentFileCompat.CREATE to "b1.txt",
-                DocumentFileCompat.CREATE to "b2.txt",
-                DocumentFileCompat.CREATE to "b3.txt",
+                DirectoryObserver.CREATE to "b1.txt",
+                DirectoryObserver.CREATE to "b2.txt",
+                DirectoryObserver.CREATE to "b3.txt",
             ),
             setOf(requireEvent(), requireEvent(), requireEvent())
         )
@@ -375,8 +375,8 @@ class ObserverResilienceTest {
 
         assertEquals(
             setOf(
-                DocumentFileCompat.CREATE to "m1.txt",
-                DocumentFileCompat.CREATE to "m2.txt",
+                DirectoryObserver.CREATE to "m1.txt",
+                DirectoryObserver.CREATE to "m2.txt",
             ),
             setOf(requireEvent(), requireEvent())
         )
@@ -404,7 +404,7 @@ class ObserverResilienceTest {
         startAndAwaitWatching(observer!!)
         createFile("recovered-materialization.txt")
         notifyChildren()
-        assertEquals(DocumentFileCompat.CREATE to "recovered-materialization.txt", requireEvent())
+        assertEquals(DirectoryObserver.CREATE to "recovered-materialization.txt", requireEvent())
     }
 
     @Test

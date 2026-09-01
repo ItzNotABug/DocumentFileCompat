@@ -73,14 +73,14 @@ class SnapshotDifferTest {
     @Test
     fun newId_emitsCreate() {
         val result = SnapshotDiffer.diff(snapshotOf(child("a")), snapshotOf(child("a"), child("b")))
-        assertEquals(events(DocumentFileCompat.CREATE to "b"), result.simplified())
+        assertEquals(events(DirectoryObserver.CREATE to "b"), result.simplified())
     }
 
     @Test
     fun emptyOldToPopulated_emitsCreateForEverything() {
         val result = SnapshotDiffer.diff(LinkedHashMap(), snapshotOf(child("a"), child("b")))
         assertEquals(
-            events(DocumentFileCompat.CREATE to "a", DocumentFileCompat.CREATE to "b"),
+            events(DirectoryObserver.CREATE to "a", DirectoryObserver.CREATE to "b"),
             result.simplified()
         )
     }
@@ -88,7 +88,7 @@ class SnapshotDifferTest {
     @Test
     fun missingId_emitsDeleteWithLastKnownDocument() {
         val result = SnapshotDiffer.diff(snapshotOf(child("a"), child("b")), snapshotOf(child("a")))
-        assertEquals(events(DocumentFileCompat.DELETE to "b"), result.simplified())
+        assertEquals(events(DirectoryObserver.DELETE to "b"), result.simplified())
         assertEquals("b.txt", result.single().document.name)
     }
 
@@ -98,7 +98,7 @@ class SnapshotDifferTest {
             snapshotOf(child("a", size = 10L)),
             snapshotOf(child("a", size = 20L)),
         )
-        assertEquals(events(DocumentFileCompat.MODIFY to "a"), result.simplified())
+        assertEquals(events(DirectoryObserver.MODIFY to "a"), result.simplified())
     }
 
     @Test
@@ -107,7 +107,7 @@ class SnapshotDifferTest {
             snapshotOf(child("a", lastModified = 100L)),
             snapshotOf(child("a", lastModified = 200L)),
         )
-        assertEquals(events(DocumentFileCompat.MODIFY to "a"), result.simplified())
+        assertEquals(events(DirectoryObserver.MODIFY to "a"), result.simplified())
     }
 
     @Test
@@ -116,7 +116,7 @@ class SnapshotDifferTest {
             snapshotOf(child("a", mime = "text/plain")),
             snapshotOf(child("a", mime = "application/json")),
         )
-        assertEquals(events(DocumentFileCompat.MODIFY to "a"), result.simplified())
+        assertEquals(events(DirectoryObserver.MODIFY to "a"), result.simplified())
     }
 
     @Test
@@ -140,7 +140,7 @@ class SnapshotDifferTest {
         )
 
         assertEquals(
-            events(DocumentFileCompat.MOVED_FROM to "a", DocumentFileCompat.MOVED_TO to "a"),
+            events(DirectoryObserver.MOVED_FROM to "a", DirectoryObserver.MOVED_TO to "a"),
             result.simplified()
         )
         assertEquals("old.txt", result[0].document.name)
@@ -155,7 +155,7 @@ class SnapshotDifferTest {
         )
 
         assertEquals(
-            events(DocumentFileCompat.MOVED_FROM to "a", DocumentFileCompat.MOVED_TO to "a"),
+            events(DirectoryObserver.MOVED_FROM to "a", DirectoryObserver.MOVED_TO to "a"),
             result.simplified()
         )
     }
@@ -169,7 +169,7 @@ class SnapshotDifferTest {
         )
 
         assertEquals(
-            events(DocumentFileCompat.DELETE to "a", DocumentFileCompat.CREATE to "b"),
+            events(DirectoryObserver.DELETE to "a", DirectoryObserver.CREATE to "b"),
             result.simplified()
         )
     }
@@ -199,13 +199,13 @@ class SnapshotDifferTest {
 
         assertEquals(
             events(
-                DocumentFileCompat.DELETE to "gone1",
-                DocumentFileCompat.DELETE to "gone2",
-                DocumentFileCompat.MOVED_FROM to "renamed",
-                DocumentFileCompat.MOVED_TO to "renamed",
-                DocumentFileCompat.MODIFY to "changed",
-                DocumentFileCompat.CREATE to "fresh1",
-                DocumentFileCompat.CREATE to "fresh2",
+                DirectoryObserver.DELETE to "gone1",
+                DirectoryObserver.DELETE to "gone2",
+                DirectoryObserver.MOVED_FROM to "renamed",
+                DirectoryObserver.MOVED_TO to "renamed",
+                DirectoryObserver.MODIFY to "changed",
+                DirectoryObserver.CREATE to "fresh1",
+                DirectoryObserver.CREATE to "fresh2",
             ),
             result.simplified()
         )
@@ -225,25 +225,25 @@ class SnapshotDifferTest {
         )
 
         assertEquals(
-            events(DocumentFileCompat.DELETE to "gone", DocumentFileCompat.CREATE to "fresh"),
+            events(DirectoryObserver.DELETE to "gone", DirectoryObserver.CREATE to "fresh"),
             SnapshotDiffer.diff(
-                old, new, DocumentFileCompat.CREATE or DocumentFileCompat.DELETE
+                old, new, DirectoryObserver.CREATE or DirectoryObserver.DELETE
             ).simplified()
         )
 
         assertEquals(
-            events(DocumentFileCompat.MODIFY to "changed"),
-            SnapshotDiffer.diff(old, new, DocumentFileCompat.MODIFY).simplified()
+            events(DirectoryObserver.MODIFY to "changed"),
+            SnapshotDiffer.diff(old, new, DirectoryObserver.MODIFY).simplified()
         )
 
         // The move pair can be filtered to either half individually.
         assertEquals(
-            events(DocumentFileCompat.MOVED_FROM to "renamed"),
-            SnapshotDiffer.diff(old, new, DocumentFileCompat.MOVED_FROM).simplified()
+            events(DirectoryObserver.MOVED_FROM to "renamed"),
+            SnapshotDiffer.diff(old, new, DirectoryObserver.MOVED_FROM).simplified()
         )
         assertEquals(
-            events(DocumentFileCompat.MOVED_TO to "renamed"),
-            SnapshotDiffer.diff(old, new, DocumentFileCompat.MOVED_TO).simplified()
+            events(DirectoryObserver.MOVED_TO to "renamed"),
+            SnapshotDiffer.diff(old, new, DirectoryObserver.MOVED_TO).simplified()
         )
     }
 
@@ -266,11 +266,11 @@ class SnapshotDifferTest {
     @Test
     fun eventConstants_aliasFileObserverBitValues() {
         // inotify values are ABI-stable; guards against accidental constant edits.
-        assertEquals(0x00000002, DocumentFileCompat.MODIFY)
-        assertEquals(0x00000040, DocumentFileCompat.MOVED_FROM)
-        assertEquals(0x00000080, DocumentFileCompat.MOVED_TO)
-        assertEquals(0x00000100, DocumentFileCompat.CREATE)
-        assertEquals(0x00000200, DocumentFileCompat.DELETE)
+        assertEquals(0x00000002, DirectoryObserver.MODIFY)
+        assertEquals(0x00000040, DirectoryObserver.MOVED_FROM)
+        assertEquals(0x00000080, DirectoryObserver.MOVED_TO)
+        assertEquals(0x00000100, DirectoryObserver.CREATE)
+        assertEquals(0x00000200, DirectoryObserver.DELETE)
     }
 
     // endregion

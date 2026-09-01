@@ -3,21 +3,15 @@ package com.lazygeniouz.dfc.file
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
-import android.os.FileObserver
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import com.lazygeniouz.dfc.controller.DocumentController
-import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.ALL_EVENTS
-import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.CREATE
-import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.DELETE
-import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.MODIFY
-import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.MOVED_FROM
-import com.lazygeniouz.dfc.file.DocumentFileCompat.Companion.MOVED_TO
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.observer.DirectoryEventMask
+import com.lazygeniouz.dfc.observer.DirectoryObserver
 import com.lazygeniouz.dfc.observer.DirectoryWatcher
-import java.io.Closeable
 import java.io.File
 
 /**
@@ -212,75 +206,33 @@ abstract class DocumentFileCompat(
     }
 
     /**
-     * Creates a stopped [Observer] for this SAF directory's direct children.
+     * Creates a stopped [DirectoryObserver] for this SAF directory's direct children.
      *
      * Existing children emit no events. Changes may coalesce between provider notifications,
      * and callbacks run on a worker thread with detached document snapshots.
      *
-     * @param mask Bitwise OR of the events to receive, [ALL_EVENTS] by default.
+     * @param mask Bitwise OR of the events to receive, [DirectoryObserver.ALL_EVENTS] by default.
      * @throws UnsupportedOperationException if this is not a SAF-backed directory.
-     * @throws IllegalArgumentException if [mask] contains no supported event.
+     * @throws IllegalArgumentException if [mask] is empty or contains an unsupported event.
      */
     fun observe(
-        mask: Int = ALL_EVENTS,
+        @DirectoryEventMask mask: Int = DirectoryObserver.ALL_EVENTS,
         listener: (event: Int, document: DocumentFileCompat) -> Unit,
-    ): Observer {
+    ): DirectoryObserver {
         if (this !is TreeDocumentFileCompat || !isDirectory()) {
             throw UnsupportedOperationException(
                 "observe() requires a directory backed by a SAF tree uri."
             )
         }
 
-        val effectiveMask = mask and ALL_EVENTS
-        require(effectiveMask != 0) { "The mask contains no supported event." }
+        require(mask != 0 && (mask and DirectoryObserver.ALL_EVENTS) == mask) {
+            "The mask must contain only supported observer events."
+        }
 
-        return Observer(DirectoryWatcher(this, effectiveMask, listener))
-    }
-
-    /**
-     * A directory observation created via [observe]. Starting and stopping are idempotent and
-     * thread-safe; [stopWatching] is safe inside callbacks. Also a [Closeable].
-     */
-    class Observer internal constructor(private val watcher: DirectoryWatcher) : Closeable {
-
-        /**
-         * Starts watching. [onReady] follows a successful baseline; [onError] reports terminal
-         * startup, permission, or directory failures. Starts are ignored while active or until a
-         * terminal callback returns.
-         */
-        fun startWatching(
-            onError: (Throwable) -> Unit = {},
-            onReady: () -> Unit = {},
-        ) = watcher.startWatching(onError, onReady)
-
-        /**
-         * Invalidates the session and prevents further callbacks before returning. Cleanup
-         * then completes on the worker after any provider operation already in flight returns.
-         */
-        fun stopWatching() = watcher.stopWatching()
-
-        override fun close() = stopWatching()
+        return DirectoryObserver(DirectoryWatcher(this, mask, listener))
     }
 
     companion object {
-
-        /** Same as [FileObserver.MODIFY]: a child's contents / metadata changed. */
-        const val MODIFY = FileObserver.MODIFY
-
-        /** Same as [FileObserver.MOVED_FROM]: a child was renamed, carries the **old** name. */
-        const val MOVED_FROM = FileObserver.MOVED_FROM
-
-        /** Same as [FileObserver.MOVED_TO]: a child was renamed, carries the **new** name. */
-        const val MOVED_TO = FileObserver.MOVED_TO
-
-        /** Same as [FileObserver.CREATE]: a child was created. */
-        const val CREATE = FileObserver.CREATE
-
-        /** Same as [FileObserver.DELETE]: a child was deleted. */
-        const val DELETE = FileObserver.DELETE
-
-        /** Every event [observe] can produce (unlike [FileObserver.ALL_EVENTS]). */
-        const val ALL_EVENTS = MODIFY or MOVED_FROM or MOVED_TO or CREATE or DELETE
 
         /**
          * Build a Document Tree with this helper.

@@ -19,19 +19,19 @@ internal object SnapshotDiffer {
     internal fun diff(
         old: Map<String, DocumentFileCompat>,
         new: Map<String, DocumentFileCompat>,
-        mask: Int = DocumentFileCompat.ALL_EVENTS,
+        @DirectoryEventMask mask: Int = DirectoryObserver.ALL_EVENTS,
         cancellationSignal: CancellationSignal? = null,
     ): List<DiffEvent> {
         if (old.isEmpty() && new.isEmpty()) return emptyList()
 
         val events = ArrayList<DiffEvent>()
-        if (mask includes DocumentFileCompat.DELETE) {
+        if (mask includes DirectoryObserver.DELETE) {
             collectDeletions(old, new, events, cancellationSignal)
         }
         if (mask and CHANGE_EVENTS != 0) {
             collectChanges(old, new, mask, events, cancellationSignal)
         }
-        if (mask includes DocumentFileCompat.CREATE) {
+        if (mask includes DirectoryObserver.CREATE) {
             collectCreations(old, new, events, cancellationSignal)
         }
         cancellationSignal?.throwIfCanceled()
@@ -49,7 +49,7 @@ internal object SnapshotDiffer {
         for ((documentId, oldChild) in old) {
             if ((row++ and CANCELLATION_CHECK_MASK) == 0) cancellationSignal?.throwIfCanceled()
             if (documentId !in new) {
-                events.add(DiffEvent(DocumentFileCompat.DELETE, oldChild))
+                events.add(DiffEvent(DirectoryObserver.DELETE, oldChild))
             }
         }
     }
@@ -71,16 +71,16 @@ internal object SnapshotDiffer {
             if (oldChild === newChild) continue
 
             if (oldChild.name != newChild.name) {
-                if (mask includes DocumentFileCompat.MOVED_FROM) {
-                    events.add(DiffEvent(DocumentFileCompat.MOVED_FROM, oldChild))
+                if (mask includes DirectoryObserver.MOVED_FROM) {
+                    events.add(DiffEvent(DirectoryObserver.MOVED_FROM, oldChild))
                 }
-                if (mask includes DocumentFileCompat.MOVED_TO) {
-                    events.add(DiffEvent(DocumentFileCompat.MOVED_TO, newChild))
+                if (mask includes DirectoryObserver.MOVED_TO) {
+                    events.add(DiffEvent(DirectoryObserver.MOVED_TO, newChild))
                 }
             } else if (
-                mask includes DocumentFileCompat.MODIFY && metadataChanged(oldChild, newChild)
+                mask includes DirectoryObserver.MODIFY && metadataChanged(oldChild, newChild)
             ) {
-                events.add(DiffEvent(DocumentFileCompat.MODIFY, newChild))
+                events.add(DiffEvent(DirectoryObserver.MODIFY, newChild))
             }
         }
     }
@@ -96,7 +96,7 @@ internal object SnapshotDiffer {
         for ((documentId, newChild) in new) {
             if ((row++ and CANCELLATION_CHECK_MASK) == 0) cancellationSignal?.throwIfCanceled()
             if (documentId !in old) {
-                events.add(DiffEvent(DocumentFileCompat.CREATE, newChild))
+                events.add(DiffEvent(DirectoryObserver.CREATE, newChild))
             }
         }
     }
@@ -111,6 +111,6 @@ internal object SnapshotDiffer {
     private infix fun Int.includes(event: Int): Boolean = and(event) != 0
 
     private const val CHANGE_EVENTS =
-        DocumentFileCompat.MOVED_FROM or DocumentFileCompat.MOVED_TO or DocumentFileCompat.MODIFY
+        DirectoryObserver.MOVED_FROM or DirectoryObserver.MOVED_TO or DirectoryObserver.MODIFY
     private const val CANCELLATION_CHECK_MASK = 63
 }

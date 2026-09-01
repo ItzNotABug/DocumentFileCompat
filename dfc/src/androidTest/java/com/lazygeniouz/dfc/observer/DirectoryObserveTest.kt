@@ -1,5 +1,6 @@
 package com.lazygeniouz.dfc.observer
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -39,7 +40,7 @@ class DirectoryObserveTest {
     )
 
     private val events = LinkedBlockingQueue<Pair<Int, String>>()
-    private var observer: DocumentFileCompat.Observer? = null
+    private var observer: DirectoryObserver? = null
     private var openedCursorBaseline = 0
     private var closedCursorBaseline = 0
 
@@ -67,7 +68,9 @@ class DirectoryObserveTest {
 
     // region helpers
 
-    private fun observe(mask: Int = DocumentFileCompat.ALL_EVENTS): DocumentFileCompat.Observer {
+    private fun observe(
+        @DirectoryEventMask mask: Int = DirectoryObserver.ALL_EVENTS,
+    ): DirectoryObserver {
         return directory.observe(mask) { event, document ->
             events.add(event to document.name)
         }.also { observer = it }
@@ -94,7 +97,7 @@ class DirectoryObserveTest {
         return received
     }
 
-    private fun startAndAwaitWatching(started: DocumentFileCompat.Observer) {
+    private fun startAndAwaitWatching(started: DirectoryObserver) {
         val completed = CountDownLatch(1)
         val failure = AtomicReference<Throwable?>()
         started.startWatching(
@@ -148,7 +151,7 @@ class DirectoryObserveTest {
         notifyChildren()
 
         // The very first event after activation must be the new file, not a baseline replay.
-        assertEquals(DocumentFileCompat.CREATE to "c.txt", awaitEvent())
+        assertEquals(DirectoryObserver.CREATE to "c.txt", awaitEvent())
     }
 
     @Test
@@ -160,7 +163,7 @@ class DirectoryObserveTest {
         victim.delete()
         notifyChildren()
 
-        awaitEventFor("victim.txt", DocumentFileCompat.DELETE)
+        awaitEventFor("victim.txt", DirectoryObserver.DELETE)
     }
 
     @Test
@@ -172,7 +175,7 @@ class DirectoryObserveTest {
         target.writeText("123456789") // size change: independent of mtime resolution
         notifyChildren()
 
-        awaitEventFor("mod.txt", DocumentFileCompat.MODIFY)
+        awaitEventFor("mod.txt", DirectoryObserver.MODIFY)
     }
 
     @Test
@@ -186,8 +189,8 @@ class DirectoryObserveTest {
         target.renameTo(File(backingDir, "new-name.txt"))
         notifyChildren()
 
-        assertEquals(DocumentFileCompat.DELETE to "old-name.txt", awaitEvent())
-        assertEquals(DocumentFileCompat.CREATE to "new-name.txt", awaitEvent())
+        assertEquals(DirectoryObserver.DELETE to "old-name.txt", awaitEvent())
+        assertEquals(DirectoryObserver.CREATE to "new-name.txt", awaitEvent())
     }
 
     @Test
@@ -199,7 +202,7 @@ class DirectoryObserveTest {
             callbackEvents.add(
                 Triple(event, document.name, DocumentsContract.getDocumentId(document.uri))
             )
-            if (event == DocumentFileCompat.CREATE && document.name == "callback.txt") {
+            if (event == DirectoryObserver.CREATE && document.name == "callback.txt") {
                 renameSucceeded.set(document.renameTo("renamed.txt"))
                 renameFinished.countDown()
             }
@@ -219,15 +222,15 @@ class DirectoryObserveTest {
             ?: throw AssertionError("Missing CREATE event after rename")
 
         assertEquals(
-            Triple(DocumentFileCompat.CREATE, "callback.txt", "${TestDocumentsProvider.ROOT_ID}/callback.txt"),
+            Triple(DirectoryObserver.CREATE, "callback.txt", "${TestDocumentsProvider.ROOT_ID}/callback.txt"),
             first,
         )
         assertEquals(
-            Triple(DocumentFileCompat.DELETE, "callback.txt", "${TestDocumentsProvider.ROOT_ID}/callback.txt"),
+            Triple(DirectoryObserver.DELETE, "callback.txt", "${TestDocumentsProvider.ROOT_ID}/callback.txt"),
             second,
         )
         assertEquals(
-            Triple(DocumentFileCompat.CREATE, "renamed.txt", "${TestDocumentsProvider.ROOT_ID}/renamed.txt"),
+            Triple(DirectoryObserver.CREATE, "renamed.txt", "${TestDocumentsProvider.ROOT_ID}/renamed.txt"),
             third,
         )
     }
@@ -235,14 +238,14 @@ class DirectoryObserveTest {
     @Test
     fun maskFiltering_suppressesUnrequestedEvents() {
         val victim = createFile("victim.txt")
-        val deleteOnly = observe(DocumentFileCompat.DELETE)
+        val deleteOnly = observe(DirectoryObserver.DELETE)
         startAndAwaitWatching(deleteOnly)
 
         createFile("noise.txt") // CREATE: must be filtered out
         victim.delete()
         notifyChildren()
 
-        assertEquals(DocumentFileCompat.DELETE to "victim.txt", awaitEvent())
+        assertEquals(DirectoryObserver.DELETE to "victim.txt", awaitEvent())
     }
 
     @Test
@@ -257,7 +260,7 @@ class DirectoryObserveTest {
         val received = mutableSetOf<String>()
         repeat(3) {
             val (event, name) = awaitEvent() ?: fail("Missing burst event").let { throw AssertionError() }
-            assertEquals(DocumentFileCompat.CREATE, event)
+            assertEquals(DirectoryObserver.CREATE, event)
             received.add(name)
         }
         assertEquals(setOf("b1.txt", "b2.txt", "b3.txt"), received)
@@ -265,7 +268,7 @@ class DirectoryObserveTest {
         // Sentinel proves the 5 notifications produced no duplicate events.
         createFile("sentinel.txt")
         notifyChildren()
-        assertEquals(DocumentFileCompat.CREATE to "sentinel.txt", awaitEvent())
+        assertEquals(DirectoryObserver.CREATE to "sentinel.txt", awaitEvent())
     }
 
     @Test
@@ -323,7 +326,7 @@ class DirectoryObserveTest {
         createFile("again.txt")
         notifyChildren()
 
-        awaitEventFor("again.txt", DocumentFileCompat.CREATE)
+        awaitEventFor("again.txt", DirectoryObserver.CREATE)
     }
 
     @Test
@@ -348,7 +351,7 @@ class DirectoryObserveTest {
     fun stopFromInsideListener_doesNotDeadlock_orEmitFurther() {
         val callbacks = AtomicInteger(0)
         val firstEvent = CountDownLatch(1)
-        lateinit var selfStopping: DocumentFileCompat.Observer
+        lateinit var selfStopping: DirectoryObserver
         selfStopping = directory.observe { _, _ ->
             callbacks.incrementAndGet()
             selfStopping.stopWatching() // must not deadlock
@@ -385,13 +388,16 @@ class DirectoryObserveTest {
     }
 
     @Test
-    fun observe_withNoSupportedEventBits_throws() {
+    @SuppressLint("WrongConstant")
+    fun observe_withInvalidEventMask_throws() {
         assertThrows(IllegalArgumentException::class.java) {
             directory.observe(0) { _, _ -> }
         }
-        // Only unsupported FileObserver bits: masked to zero, equally useless.
         assertThrows(IllegalArgumentException::class.java) {
             directory.observe(0x20 /* OPEN */) { _, _ -> }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            directory.observe(DirectoryObserver.CREATE or 0x20 /* OPEN */) { _, _ -> }
         }
     }
 }

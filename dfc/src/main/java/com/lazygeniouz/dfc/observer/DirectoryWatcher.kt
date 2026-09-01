@@ -22,7 +22,7 @@ import java.io.FileNotFoundException
  */
 internal class DirectoryWatcher(
     private val directory: DocumentFileCompat,
-    private val mask: Int,
+    @param:DirectoryEventMask private val mask: Int,
     private val listener: (event: Int, document: DocumentFileCompat) -> Unit,
 ) {
 
