@@ -93,7 +93,7 @@ Existing children do not produce events. `onReady` marks the point after which m
 observable, and terminal initialization, permission, or directory failures use `onError`.
 Close it with the owning lifecycle. Observation is provider-driven and snapshot-based, so providers
 must publish change notifications, each refresh is Θ(children), bursts may coalesce, and
-partial/loading cursors are not supported. One transient refresh retry is attempted automatically.
+partial/loading results are ignored until complete. One transient refresh retry is attempted.
 
 ## Performance
 

@@ -44,7 +44,7 @@ class DirectoryObserver private constructor(
             listener: (event: Int, document: DocumentFileCompat) -> Unit,
         ) = DirectoryObserver(directory, mask, listener)
 
-        /** Same as [FileObserver.MODIFY]: a child's contents or metadata changed. */
+        /** A child's size, last-modified time, or MIME type changed. */
         const val MODIFY = FileObserver.MODIFY
 
         /** Same as [FileObserver.MOVED_FROM]: a child was renamed, carrying its old name. */
