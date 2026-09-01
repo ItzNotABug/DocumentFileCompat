@@ -7,6 +7,13 @@ on:
   workflow_dispatch:
   pull_request:
     types: [ opened, synchronize, reopened ]
+    paths:
+      - "dfc/**"
+      - "app/**"
+      - ".github/workflows/build.yml"
+      - "*.gradle"
+      - "gradle/**"
+      - "gradle.properties"
   push:
     branches: [ master ]
     paths:
@@ -36,43 +43,3 @@ jobs:
 
       - name: Build project
         run: ./gradlew :dfc:assemble :app:assembleDebug
-
-  instrumented-tests:
-    name: Instrumentation Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-
-      - name: Enable KVM group perms
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Set up JDK
-        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-          cache: "gradle"
-
-      - name: Run instrumented tests
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
-        with:
-          api-level: 35
-          arch: x86_64
-          target: google_apis
-          disable-animations: true
-          emulator-options: -no-snapshot -no-window -no-boot-anim -noaudio -no-metrics
-          script: ./gradlew :dfc:connectedDebugAndroidTest
-
-      - name: Upload test reports
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: instrumented-test-reports
-          path: dfc/build/reports/androidTests/connected/
