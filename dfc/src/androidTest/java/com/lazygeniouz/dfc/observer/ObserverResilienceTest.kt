@@ -142,9 +142,18 @@ class ObserverResilienceTest {
     }
 
     private fun awaitQueryDelta(baseline: Int, expected: Int, timeoutMs: Long = 5000) {
+        awaitCounterDelta(TestDocumentsProvider.childQueryCount, baseline, expected, timeoutMs)
+    }
+
+    private fun awaitCounterDelta(
+        counter: AtomicInteger,
+        baseline: Int,
+        expected: Int,
+        timeoutMs: Long = 5000,
+    ) {
         val deadline = SystemClock.elapsedRealtime() + timeoutMs
-        while (TestDocumentsProvider.childQueryCount.get() - baseline < expected) {
-            if (SystemClock.elapsedRealtime() >= deadline) fail("Expected $expected refresh queries")
+        while (counter.get() - baseline < expected) {
+            if (SystemClock.elapsedRealtime() >= deadline) fail("Expected $expected counter updates")
             Thread.sleep(10)
         }
     }
@@ -380,12 +389,12 @@ class ObserverResilienceTest {
     fun nullRefreshCursor_isRecoverableAndReconcilesMissedChanges() {
         startAndAwaitWatching(observe())
 
-        val queryBaseline = TestDocumentsProvider.childQueryCount.get()
+        val nullBaseline = TestDocumentsProvider.nullChildQueries.get()
         TestDocumentsProvider.returnNullChildQueries = true
         createFile("missed-null-cursor.txt")
         notifyChildren()
 
-        awaitQueryDelta(queryBaseline, 2)
+        awaitCounterDelta(TestDocumentsProvider.nullChildQueries, nullBaseline, 2)
         assertTrue(errors.isEmpty())
         assertTrue(observerThreadAlive())
         assertNull(events.poll(250, TimeUnit.MILLISECONDS))
@@ -403,11 +412,11 @@ class ObserverResilienceTest {
     fun nullDirectoryCheckCursor_isRecoverable() {
         startAndAwaitWatching(observe())
 
-        val queryBaseline = TestDocumentsProvider.childQueryCount.get()
+        val nullBaseline = TestDocumentsProvider.nullDocumentQueries.get()
         TestDocumentsProvider.returnNullDocumentQueries = true
         notifyChildren()
 
-        awaitQueryDelta(queryBaseline, 2)
+        awaitCounterDelta(TestDocumentsProvider.nullDocumentQueries, nullBaseline, 2)
         assertTrue(errors.isEmpty())
         assertTrue(observerThreadAlive())
 

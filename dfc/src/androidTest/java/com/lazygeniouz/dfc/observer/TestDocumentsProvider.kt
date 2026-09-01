@@ -38,7 +38,10 @@ class TestDocumentsProvider : DocumentsProvider() {
         MatrixCursor(projection ?: arrayOf(Root.COLUMN_ROOT_ID))
 
     override fun queryDocument(documentId: String, projection: Array<out String>?): Cursor? {
-        if (returnNullDocumentQueries) return null
+        if (returnNullDocumentQueries) {
+            nullDocumentQueries.incrementAndGet()
+            return null
+        }
         return MatrixCursor(resolve(projection)).also { cursor ->
             include(cursor, documentId, fileFor(documentId))
         }
@@ -57,7 +60,10 @@ class TestDocumentsProvider : DocumentsProvider() {
             failedChildQueries.incrementAndGet()
             throw IllegalStateException("Transient failure (test)")
         }
-        if (returnNullChildQueries) return null
+        if (returnNullChildQueries) {
+            nullChildQueries.incrementAndGet()
+            return null
+        }
 
         val columns = resolve(projection)
         val loading = returnLoadingChildren
@@ -221,6 +227,8 @@ class TestDocumentsProvider : DocumentsProvider() {
 
         val childQueryCount = AtomicInteger(0)
         val failedChildQueries = AtomicInteger(0)
+        val nullChildQueries = AtomicInteger(0)
+        val nullDocumentQueries = AtomicInteger(0)
         val failNextChildQueries = AtomicInteger(0)
         val openChildCursors = AtomicInteger(0)
         val closedChildCursors = AtomicInteger(0)
