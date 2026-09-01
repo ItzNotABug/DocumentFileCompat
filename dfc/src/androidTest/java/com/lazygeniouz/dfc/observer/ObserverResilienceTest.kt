@@ -224,7 +224,8 @@ class ObserverResilienceTest {
         assertTrue("Initial snapshot was not captured", snapshotCaptured.await(5, TimeUnit.SECONDS))
         createFile("blind-window.txt")
         notifyChildren() // No observer is registered yet; this notification is deliberately lost.
-        TestDocumentsProvider.failChildQueryAt = TestDocumentsProvider.childQueryCount.get() + 1
+        // The next query installs the lightweight cursor; fail the full reconciliation after it.
+        TestDocumentsProvider.failChildQueryAt = TestDocumentsProvider.childQueryCount.get() + 2
 
         returnGate.countDown()
         TestDocumentsProvider.childQueryReturnGate = null
@@ -235,6 +236,95 @@ class ObserverResilienceTest {
         assertTrue(failure.get() is IllegalStateException)
         awaitObserverThreadGone()
         awaitAllChildCursorsClosed()
+    }
+
+    @Test
+    fun loadingStartup_waitsForACompleteBaseline() {
+        createFile("cached.txt")
+        createFile("remote.txt")
+        TestDocumentsProvider.returnLoadingChildren = true
+        TestDocumentsProvider.loadingChildLimit = 1
+
+        val started = observe()
+        val ready = CountDownLatch(1)
+        val queryBaseline = TestDocumentsProvider.childQueryCount.get()
+        started.startWatching(onError = errors::add, onReady = ready::countDown)
+
+        awaitQueryCountAbove(queryBaseline)
+        assertFalse("Observer became ready from a partial cursor", ready.await(250, TimeUnit.MILLISECONDS))
+        assertTrue(events.isEmpty())
+
+        TestDocumentsProvider.returnLoadingChildren = false
+        notifyChildren()
+
+        assertTrue("Observer did not become ready after loading completed", ready.await(5, TimeUnit.SECONDS))
+        assertTrue(events.isEmpty())
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    fun loadingCompletionBeforeRegistration_stillBecomesReady() {
+        createFile("cached.txt")
+        createFile("remote.txt")
+        TestDocumentsProvider.returnLoadingChildren = true
+        TestDocumentsProvider.loadingChildLimit = 1
+
+        val snapshotCaptured = CountDownLatch(1)
+        val returnGate = CountDownLatch(1)
+        TestDocumentsProvider.childSnapshotCaptured = snapshotCaptured
+        TestDocumentsProvider.childQueryReturnGate = returnGate
+
+        val started = observe()
+        val ready = CountDownLatch(1)
+        started.startWatching(onError = errors::add, onReady = ready::countDown)
+
+        assertTrue("Partial snapshot was not captured", snapshotCaptured.await(5, TimeUnit.SECONDS))
+        TestDocumentsProvider.returnLoadingChildren = false
+        notifyChildren()
+        TestDocumentsProvider.childSnapshotCaptured = null
+        TestDocumentsProvider.childQueryReturnGate = null
+        returnGate.countDown()
+
+        assertTrue("Observer remained stuck on the partial cursor", ready.await(5, TimeUnit.SECONDS))
+        assertTrue(events.isEmpty())
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    fun loadingRefresh_neverTurnsOmittedRowsIntoDeletions() {
+        createFile("a.txt")
+        createFile("b.txt")
+        startAndAwaitWatching(observe())
+
+        TestDocumentsProvider.returnLoadingChildren = true
+        TestDocumentsProvider.loadingChildLimit = 1
+        val queryBaseline = TestDocumentsProvider.childQueryCount.get()
+        notifyChildren()
+        awaitQueryCountAbove(queryBaseline)
+
+        assertNull(events.poll(250, TimeUnit.MILLISECONDS))
+
+        assertTrue(File(backingDir, "b.txt").delete())
+        TestDocumentsProvider.returnLoadingChildren = false
+        notifyChildren()
+
+        assertEquals(DirectoryObserver.DELETE to "b.txt", requireEvent())
+        assertNull(events.poll(250, TimeUnit.MILLISECONDS))
+    }
+
+    @Test
+    fun readySession_retainsOnlyTheLightweightNotificationCursor() {
+        createFile("existing.txt")
+        startAndAwaitWatching(observe())
+
+        assertEquals(1, TestDocumentsProvider.activeNotificationCursors.get())
+        assertEquals(0, TestDocumentsProvider.activeSnapshotCursors.get())
+
+        observer?.stopWatching()
+        awaitObserverThreadGone()
+        awaitAllChildCursorsClosed()
+        assertEquals(0, TestDocumentsProvider.activeNotificationCursors.get())
+        assertEquals(0, TestDocumentsProvider.activeSnapshotCursors.get())
     }
 
     @Test

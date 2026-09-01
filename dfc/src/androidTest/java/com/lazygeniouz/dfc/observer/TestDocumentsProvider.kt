@@ -4,6 +4,7 @@ import android.database.ContentObserver
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.os.CancellationSignal
+import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
@@ -60,9 +61,17 @@ class TestDocumentsProvider : DocumentsProvider() {
             throw IllegalStateException("Transient failure (test)")
         }
 
-        val cursor = TrackingCursor(resolve(projection))
+        val columns = resolve(projection)
+        val loading = returnLoadingChildren
+        val notificationOnly = columns.contentEquals(arrayOf(Document.COLUMN_ICON))
+        val cursor = TrackingCursor(columns, loading, notificationOnly)
         openChildCursors.incrementAndGet()
-        fileFor(parentDocumentId).listFiles()?.sortedBy { it.name }?.forEach { child ->
+        if (notificationOnly) activeNotificationCursors.incrementAndGet()
+        else activeSnapshotCursors.incrementAndGet()
+
+        val children = fileFor(parentDocumentId).listFiles()?.sortedBy { it.name }.orEmpty()
+        val visibleChildren = if (loading) children.take(loadingChildLimit) else children
+        visibleChildren.forEach { child ->
             include(cursor, "$parentDocumentId/${child.name}", child)
         }
         cursor.setNotificationUri(
@@ -88,9 +97,18 @@ class TestDocumentsProvider : DocumentsProvider() {
     }
 
     /** Child cursor with failure injection and close accounting. */
-    private class TrackingCursor(columns: Array<out String>) : MatrixCursor(columns) {
+    private class TrackingCursor(
+        columns: Array<out String>,
+        loading: Boolean,
+        private val notificationOnly: Boolean,
+    ) : MatrixCursor(columns) {
 
         private val closedOnce = java.util.concurrent.atomic.AtomicBoolean(false)
+        private val cursorExtras = Bundle().apply {
+            putBoolean(DocumentsContract.EXTRA_LOADING, loading)
+        }
+
+        override fun getExtras(): Bundle = cursorExtras
 
         override fun getCount(): Int {
             if (revokeDuringMaterialization) {
@@ -109,7 +127,11 @@ class TestDocumentsProvider : DocumentsProvider() {
         override fun close() {
             childCursorCloseStarted?.countDown()
             childCursorCloseGate?.await(10, TimeUnit.SECONDS)
-            if (closedOnce.compareAndSet(false, true)) closedChildCursors.incrementAndGet()
+            if (closedOnce.compareAndSet(false, true)) {
+                closedChildCursors.incrementAndGet()
+                if (notificationOnly) activeNotificationCursors.decrementAndGet()
+                else activeSnapshotCursors.decrementAndGet()
+            }
             super.close()
         }
     }
@@ -176,6 +198,12 @@ class TestDocumentsProvider : DocumentsProvider() {
         var failObserverRegistration = false
 
         @Volatile
+        var returnLoadingChildren = false
+
+        @Volatile
+        var loadingChildLimit = 1
+
+        @Volatile
         var childQueryGate: CountDownLatch? = null
 
         @Volatile
@@ -195,6 +223,8 @@ class TestDocumentsProvider : DocumentsProvider() {
         val failNextChildQueries = AtomicInteger(0)
         val openChildCursors = AtomicInteger(0)
         val closedChildCursors = AtomicInteger(0)
+        val activeNotificationCursors = AtomicInteger(0)
+        val activeSnapshotCursors = AtomicInteger(0)
 
         fun resetTestControls() {
             failChildQueries = false
@@ -204,6 +234,8 @@ class TestDocumentsProvider : DocumentsProvider() {
             revokePermissions = false
             revokeDuringMaterialization = false
             failObserverRegistration = false
+            returnLoadingChildren = false
+            loadingChildLimit = 1
             childQueryGate?.countDown()
             childQueryGate = null
             childQueryReturnGate?.countDown()

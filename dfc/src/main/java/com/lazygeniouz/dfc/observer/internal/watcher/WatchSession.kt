@@ -1,4 +1,4 @@
-package com.lazygeniouz.dfc.observer
+package com.lazygeniouz.dfc.observer.internal.watcher
 
 import android.database.ContentObserver
 import android.database.Cursor
@@ -6,7 +6,7 @@ import android.os.CancellationSignal
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Process
-import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.observer.internal.snapshot.ChildState
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -45,8 +45,11 @@ internal class WatchSession(
     }
 
     // Confined to [thread].
-    var cursor: Cursor? = null
-    var snapshot: LinkedHashMap<String, DocumentFileCompat> = LinkedHashMap()
+    var notificationCursor: Cursor? = null
+    var lightweightCursorInstalled = false
+    var snapshot: LinkedHashMap<String, ChildState> = LinkedHashMap()
+    var baselineCaptured = false
+    var ready = false
     var consecutiveRefreshFailures = 0
     var retryGeneration = 0L
 

@@ -1,22 +1,16 @@
 package com.lazygeniouz.dfc.resolver
 
-import android.content.Context
 import android.database.MatrixCursor
-import android.net.Uri
 import android.os.CancellationSignal
 import android.os.OperationCanceledException
-import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
-import com.lazygeniouz.dfc.file.DocumentFileCompat
-import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
-import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.observer.internal.snapshot.ChildState
+import com.lazygeniouz.dfc.observer.internal.snapshot.SnapshotScan
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -27,13 +21,6 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class ReadChildrenReuseTest {
-
-    private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
-
-    private val parent = TreeDocumentFileCompat(
-        context, Uri.parse("content://com.test.provider/tree/root/document/root"),
-        "root", 0, 0, Document.MIME_TYPE_DIR, 0
-    )
 
     private fun row(
         id: String,
@@ -61,25 +48,34 @@ class ReadChildrenReuseTest {
 
     private fun read(
         cursor: MatrixCursor,
-        reusable: Map<String, DocumentFileCompat> = emptyMap(),
+        reusable: Map<String, ChildState> = emptyMap(),
         cancellationSignal: CancellationSignal = CancellationSignal(),
-    ): Map<String, DocumentFileCompat> {
+        trackCreations: Boolean = false,
+    ): Map<String, ChildState> = readScan(
+        cursor, reusable, cancellationSignal, trackCreations
+    ).snapshot
+
+    private fun readScan(
+        cursor: MatrixCursor,
+        reusable: Map<String, ChildState> = emptyMap(),
+        cancellationSignal: CancellationSignal = CancellationSignal(),
+        trackCreations: Boolean = false,
+    ): SnapshotScan {
         return cursor.use {
             ResolverCompat.readChildSnapshot(
-                context, it, parent, reusable, cancellationSignal
+                it, reusable, cancellationSignal, trackCreations
             )
         }
     }
 
     @Test
-    fun plainRead_keysByDocumentIdAndSetsParent() {
+    fun plainRead_keysByDocumentIdAndRetainsMetadata() {
         val children = read(cursorOf(row("a"), row("b", mime = Document.MIME_TYPE_DIR)))
 
         assertEquals(2, children.size)
-        assertEquals("a", DocumentsContract.getDocumentId(children.getValue("a").uri))
-        assertSame(parent, children.getValue("a").parentFile)
-        assertTrue(children.getValue("a") is SingleDocumentFileCompat)
-        assertTrue(children.getValue("b") is TreeDocumentFileCompat)
+        assertEquals("a", children.getValue("a").documentId)
+        assertEquals("a.txt", children.getValue("a").name)
+        assertEquals(Document.MIME_TYPE_DIR, children.getValue("b").mimeType)
     }
 
     @Test
@@ -125,13 +121,13 @@ class ReadChildrenReuseTest {
     }
 
     @Test
-    fun mimeChange_buildsFreshInstanceOfCorrectType() {
+    fun mimeChange_buildsFreshState() {
         val first = read(cursorOf(row("a", mime = "text/plain")))
         val second = read(cursorOf(row("a", mime = Document.MIME_TYPE_DIR)), reusable = first)
 
         assertNotSame(first.getValue("a"), second.getValue("a"))
-        assertTrue(first.getValue("a") is SingleDocumentFileCompat)
-        assertTrue(second.getValue("a") is TreeDocumentFileCompat)
+        assertEquals("text/plain", first.getValue("a").mimeType)
+        assertEquals(Document.MIME_TYPE_DIR, second.getValue("a").mimeType)
     }
 
     @Test
@@ -141,6 +137,22 @@ class ReadChildrenReuseTest {
 
         assertSame(first.getValue("a"), second.getValue("a"))
         assertEquals(setOf("a", "fresh"), second.keys)
+    }
+
+    @Test
+    fun creationTracking_collectsOnlyNewRowsDuringTheScan() {
+        val first = read(cursorOf(row("a"), row("gone")))
+        val second = readScan(
+            cursorOf(row("a"), row("fresh-1"), row("fresh-2")),
+            reusable = first,
+            trackCreations = true,
+        )
+
+        assertSame(first.getValue("a"), second.snapshot.getValue("a"))
+        assertEquals(
+            listOf("fresh-1", "fresh-2"),
+            second.creations.map(ChildState::documentId),
+        )
     }
 
     @Test

@@ -1,37 +1,21 @@
 package com.lazygeniouz.dfc.observer
 
 import android.os.FileObserver
-import androidx.annotation.IntDef
+import com.lazygeniouz.dfc.file.DocumentFileCompat
+import com.lazygeniouz.dfc.observer.internal.watcher.DirectoryWatcher
 import java.io.Closeable
-
-/** Restricts directory observation masks to the supported [DirectoryObserver] event flags. */
-@MustBeDocumented
-@Retention(AnnotationRetention.SOURCE)
-@Target(
-    AnnotationTarget.FIELD,
-    AnnotationTarget.FUNCTION,
-    AnnotationTarget.LOCAL_VARIABLE,
-    AnnotationTarget.PROPERTY,
-    AnnotationTarget.TYPE,
-    AnnotationTarget.VALUE_PARAMETER,
-)
-@IntDef(
-    DirectoryObserver.MODIFY,
-    DirectoryObserver.MOVED_FROM,
-    DirectoryObserver.MOVED_TO,
-    DirectoryObserver.CREATE,
-    DirectoryObserver.DELETE,
-    flag = true,
-)
-annotation class DirectoryEventMask
 
 /**
  * A direct-child observation created by [com.lazygeniouz.dfc.file.DocumentFileCompat.observe].
  * Starting and stopping are idempotent and thread-safe; [stopWatching] is safe inside callbacks.
  */
-class DirectoryObserver internal constructor(
-    private val watcher: DirectoryWatcher,
+class DirectoryObserver private constructor(
+    directory: DocumentFileCompat,
+    @DirectoryEventMask mask: Int,
+    listener: (event: Int, document: DocumentFileCompat) -> Unit,
 ) : Closeable {
+
+    private val watcher = DirectoryWatcher(directory, mask, listener)
 
     /**
      * Starts watching. [onReady] follows a successful baseline; [onError] reports terminal
@@ -52,6 +36,13 @@ class DirectoryObserver internal constructor(
     override fun close() = stopWatching()
 
     companion object {
+
+        @JvmSynthetic
+        internal fun create(
+            directory: DocumentFileCompat,
+            @DirectoryEventMask mask: Int,
+            listener: (event: Int, document: DocumentFileCompat) -> Unit,
+        ) = DirectoryObserver(directory, mask, listener)
 
         /** Same as [FileObserver.MODIFY]: a child's contents or metadata changed. */
         const val MODIFY = FileObserver.MODIFY

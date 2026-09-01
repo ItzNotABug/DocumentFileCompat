@@ -1,20 +1,26 @@
-package com.lazygeniouz.dfc.observer
+package com.lazygeniouz.dfc.observer.internal.watcher
 
 import android.database.ContentObserver
 import android.database.Cursor
 import android.os.Looper
 import android.os.OperationCanceledException
+import android.provider.DocumentsContract
 import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.logger.ErrorLogger
+import com.lazygeniouz.dfc.observer.DirectoryEventMask
+import com.lazygeniouz.dfc.observer.DirectoryObserver
+import com.lazygeniouz.dfc.observer.internal.snapshot.ChildState
+import com.lazygeniouz.dfc.observer.internal.snapshot.DiffEvent
+import com.lazygeniouz.dfc.observer.internal.snapshot.SnapshotDiffer
+import com.lazygeniouz.dfc.observer.internal.snapshot.SnapshotScan
 import com.lazygeniouz.dfc.resolver.ResolverCompat
 import java.io.FileNotFoundException
 
 /**
  * Event driven watcher for the **direct children** of a SAF directory, zero polling.
  *
- * AOSP refcounts its internal `FileObserver` against **active** directory cursors, so the
- * query [Cursor] stays alive for the lifetime of the watch & a replacement cursor is observed
- * **before** the previous one closes (no watch gap).
+ * AOSP refcounts its internal `FileObserver` against **active** directory cursors, so one
+ * lightweight [Cursor] stays alive for notifications while full snapshot cursors are temporary.
  *
  * Each start..stop cycle owns a [WatchSession] that can only release its own resources; cursor
  * & snapshot state is confined to its worker thread & the listener runs there too.
@@ -106,30 +112,26 @@ internal class DirectoryWatcher(
     }
 
     private fun doInitialize(session: WatchSession) {
-        val cursor = query(session)
+        val cursor = query(session, ResolverCompat.fullProjection)
             ?: throw FileNotFoundException("The provider returned no directory cursor")
 
         var attached = false
         try {
             session.cancellationSignal.throwIfCanceled()
             cursor.registerContentObserver(session.observer)
-            val baseline = readSnapshot(session, cursor)
-            ensureDirectoryAvailable(session, baseline)
             session.cancellationSignal.throwIfCanceled()
             if (!session.isCurrent) return
 
-            session.cursor = cursor
-            session.snapshot = baseline
+            session.notificationCursor = cursor
             attached = true
 
-            // A second snapshot closes the pre-registration blind window before readiness.
-            // Failure is terminal: readiness must never be reported with a stale baseline.
-            val startupEvents = refreshOnce(session, deliverEvents = false)
-            if (!session.isCurrent) return
-            emitReady(session)
-            for (event in startupEvents) {
-                if (!emit(session, event)) return
+            if (cursor.isLoading()) {
+                scheduleRefresh(session)
+                return
             }
+            captureBaseline(session, cursor)
+            installLightweightCursor(session)
+            finishStartup(session)
         } finally {
             if (!attached) release(cursor, session.observer)
         }
@@ -139,12 +141,23 @@ internal class DirectoryWatcher(
         session.refreshScheduled.set(false)
         if (!session.isCurrent) return
         try {
-            refreshOnce(session)
-            session.consecutiveRefreshFailures = 0
-            session.retryGeneration++
+            val completed = when {
+                !session.baselineCaptured -> resumeInitialization(session)
+                !session.ready -> finishStartup(session)
+                else -> refreshOnce(session) != null
+            }
+            if (completed) {
+                session.consecutiveRefreshFailures = 0
+                session.retryGeneration++
+            }
         } catch (cancelled: OperationCanceledException) {
             if (session.isCurrent) {
-                logTransientFailure(session, "Directory refresh was cancelled", cancelled)
+                if (session.ready) {
+                    logTransientFailure(session, "Directory refresh was cancelled", cancelled)
+                } else {
+                    ErrorLogger.logError("Directory observer initialization was cancelled", cancelled)
+                    stopSelf(session, cancelled)
+                }
             }
         } catch (security: SecurityException) {
             ErrorLogger.logError("Permission revoked, releasing the observer", security)
@@ -153,40 +166,108 @@ internal class DirectoryWatcher(
             ErrorLogger.logError("Observed directory is no longer available", unavailable)
             stopSelf(session, unavailable)
         } catch (exception: Exception) {
-            logTransientFailure(session, "Directory refresh failed", exception)
+            if (session.ready) {
+                logTransientFailure(session, "Directory refresh failed", exception)
+            } else {
+                ErrorLogger.logError("Could not initialize the directory observer", exception)
+                stopSelf(session, exception)
+            }
         }
     }
 
-    // Re-query, diff & swap cursors without a watch gap. Exceptions leave the old watch intact.
+    private fun resumeInitialization(session: WatchSession): Boolean {
+        val cursor = query(session, ResolverCompat.fullProjection)
+            ?: throw FileNotFoundException("The provider returned no directory cursor")
+
+        try {
+            session.cancellationSignal.throwIfCanceled()
+            if (cursor.isLoading()) return false
+            captureBaseline(session, cursor)
+        } finally {
+            release(cursor)
+        }
+
+        installLightweightCursor(session)
+        return finishStartup(session)
+    }
+
+    private fun captureBaseline(session: WatchSession, cursor: Cursor) {
+        val baseline = readSnapshot(session, cursor, trackCreations = false).snapshot
+        ensureDirectoryAvailable(session, baseline)
+        session.cancellationSignal.throwIfCanceled()
+        if (!session.isCurrent) return
+
+        session.snapshot = baseline
+        session.baselineCaptured = true
+    }
+
+    private fun installLightweightCursor(session: WatchSession) {
+        if (session.lightweightCursorInstalled) return
+
+        val cursor = query(session, ResolverCompat.notificationProjection)
+            ?: throw FileNotFoundException("The provider returned no notification cursor")
+
+        var attached = false
+        try {
+            session.cancellationSignal.throwIfCanceled()
+            cursor.registerContentObserver(session.observer)
+            session.cancellationSignal.throwIfCanceled()
+            if (!session.isCurrent) return
+
+            val previous = session.notificationCursor
+                ?: throw IllegalStateException("The observer has no notification cursor")
+            session.notificationCursor = cursor
+            session.lightweightCursorInstalled = true
+            attached = true
+            release(previous, session.observer)
+        } finally {
+            if (!attached) release(cursor, session.observer)
+        }
+    }
+
+    private fun finishStartup(session: WatchSession): Boolean {
+        val startupEvents = refreshOnce(session, deliverEvents = false) ?: return false
+        if (!session.isCurrent) return false
+
+        session.ready = true
+        emitReady(session)
+        for (event in startupEvents) {
+            if (!emit(session, event)) break
+        }
+        return session.isCurrent
+    }
+
+    // Re-query and atomically reconcile; incomplete results leave the committed state untouched.
     private fun refreshOnce(
         session: WatchSession,
         deliverEvents: Boolean = true,
-    ): List<SnapshotDiffer.DiffEvent> {
-        val previousCursor = session.cursor ?: return emptyList()
+    ): List<DiffEvent>? {
+        if (session.notificationCursor == null) return emptyList()
 
-        val freshCursor = query(session)
+        val freshCursor = query(session, ResolverCompat.fullProjection)
             ?: throw FileNotFoundException("The provider returned no directory cursor")
 
-        var promoted = false
         try {
             session.cancellationSignal.throwIfCanceled()
-            // Observe the fresh cursor BEFORE reading it & BEFORE closing the previous one.
-            freshCursor.registerContentObserver(session.observer)
-            val freshSnapshot = readSnapshot(session, freshCursor)
-            ensureDirectoryAvailable(session, freshSnapshot)
+            if (freshCursor.isLoading()) return null
+            val freshScan = readSnapshot(
+                session, freshCursor, trackCreations = mask includes DirectoryObserver.CREATE
+            )
+            ensureDirectoryAvailable(session, freshScan.snapshot)
             session.cancellationSignal.throwIfCanceled()
             if (!session.isCurrent) return emptyList()
 
             val events = SnapshotDiffer.diff(
-                session.snapshot, freshSnapshot, mask, session.cancellationSignal
+                session.snapshot,
+                freshScan.snapshot,
+                mask,
+                session.cancellationSignal,
+                freshScan.creations,
             )
             session.cancellationSignal.throwIfCanceled()
             if (!session.isCurrent) return emptyList()
 
-            session.cursor = freshCursor
-            session.snapshot = freshSnapshot
-            promoted = true
-            release(previousCursor, session.observer)
+            session.snapshot = freshScan.snapshot
 
             if (deliverEvents) {
                 for (diffEvent in events) {
@@ -195,24 +276,29 @@ internal class DirectoryWatcher(
             }
             return events
         } finally {
-            if (!promoted) release(freshCursor, session.observer)
+            release(freshCursor)
         }
     }
 
-    private fun query(session: WatchSession): Cursor? {
+    private fun query(session: WatchSession, projection: Array<String>): Cursor? {
         return directory.context.contentResolver.query(
             ResolverCompat.createChildrenUri(directory.uri),
-            ResolverCompat.fullProjection,
+            projection,
             null, null, null,
             session.cancellationSignal,
         )
     }
 
-    private fun emit(session: WatchSession, diffEvent: SnapshotDiffer.DiffEvent): Boolean {
+    private fun emit(session: WatchSession, diffEvent: DiffEvent): Boolean {
         return synchronized(session.callbackLock) {
             if (!session.isCurrent) return@synchronized false
             try {
-                listener(diffEvent.event, ResolverCompat.copyForCallback(diffEvent.document))
+                listener(
+                    diffEvent.event,
+                    ResolverCompat.materializeChild(
+                        directory.context, directory, diffEvent.child
+                    )
+                )
             } catch (exception: Exception) {
                 ErrorLogger.logError("Observer listener threw an exception", exception)
             }
@@ -223,13 +309,13 @@ internal class DirectoryWatcher(
     private fun readSnapshot(
         session: WatchSession,
         cursor: Cursor,
-    ): LinkedHashMap<String, DocumentFileCompat> {
+        trackCreations: Boolean,
+    ): SnapshotScan {
         return ResolverCompat.readChildSnapshot(
-            directory.context,
             cursor,
-            directory,
             session.snapshot,
             session.cancellationSignal,
+            trackCreations,
         )
     }
 
@@ -246,7 +332,7 @@ internal class DirectoryWatcher(
 
     private fun ensureDirectoryAvailable(
         session: WatchSession,
-        snapshot: Map<String, DocumentFileCompat>,
+        snapshot: Map<String, ChildState>,
     ) {
         if (snapshot.isEmpty() && !ResolverCompat.isExistingDirectory(
                 directory.context,
@@ -308,20 +394,25 @@ internal class DirectoryWatcher(
 
     // Runs on the session's worker, always last: releases its resources & quits the looper.
     private fun teardown(session: WatchSession) {
-        val cursor = session.cursor
-        session.cursor = null
+        val cursor = session.notificationCursor
+        session.notificationCursor = null
+        session.lightweightCursorInstalled = false
         session.snapshot = LinkedHashMap()
+        session.baselineCaptured = false
+        session.ready = false
 
         if (cursor != null) release(cursor, session.observer)
 
         Looper.myLooper()?.quitSafely()
     }
 
-    // The single, exception-safe cursor cleanup: unregister + close, never throws.
-    private fun release(cursor: Cursor, observer: ContentObserver) {
-        try {
-            cursor.unregisterContentObserver(observer)
-        } catch (_: Exception) {
+    // The single exception-safe cursor cleanup; unregisters when this observer was attached.
+    private fun release(cursor: Cursor, observer: ContentObserver? = null) {
+        if (observer != null) {
+            try {
+                cursor.unregisterContentObserver(observer)
+            } catch (_: Exception) {
+            }
         }
         try {
             cursor.close()
@@ -332,5 +423,11 @@ internal class DirectoryWatcher(
     private companion object {
         const val MAX_AUTOMATIC_REFRESH_RETRIES = 1
         const val REFRESH_RETRY_DELAY_MS = 200L
+    }
+
+    private infix fun Int.includes(event: Int): Boolean = and(event) != 0
+
+    private fun Cursor.isLoading(): Boolean {
+        return extras.getBoolean(DocumentsContract.EXTRA_LOADING, false)
     }
 }

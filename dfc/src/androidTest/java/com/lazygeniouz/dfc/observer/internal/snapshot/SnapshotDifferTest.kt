@@ -1,15 +1,9 @@
-package com.lazygeniouz.dfc.observer
+package com.lazygeniouz.dfc.observer.internal.snapshot
 
-import android.content.Context
-import android.net.Uri
 import android.os.CancellationSignal
 import android.os.OperationCanceledException
-import android.provider.DocumentsContract
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
-import com.lazygeniouz.dfc.file.DocumentFileCompat
-import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
-import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.observer.DirectoryObserver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -22,8 +16,6 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SnapshotDifferTest {
 
-    private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
-
     private fun child(
         id: String,
         name: String = "$id.txt",
@@ -31,26 +23,18 @@ class SnapshotDifferTest {
         size: Long = 10L,
         lastModified: Long = 100L,
         flags: Int = 0,
-    ): DocumentFileCompat {
-        val uri = Uri.parse("content://com.test.provider/tree/root/document/$id")
-        val document = if (mime == "vnd.android.document/directory") {
-            TreeDocumentFileCompat(context, uri, name, size, lastModified, mime, flags)
-        } else {
-            SingleDocumentFileCompat(context, uri, name, size, lastModified, mime, flags)
-        }
-        return document
-    }
+    ) = ChildState(id, name, size, lastModified, mime, flags)
 
-    private fun snapshotOf(vararg children: DocumentFileCompat): LinkedHashMap<String, DocumentFileCompat> {
-        val map = LinkedHashMap<String, DocumentFileCompat>()
-        children.forEach { map[DocumentsContract.getDocumentId(it.uri)] = it }
+    private fun snapshotOf(vararg children: ChildState): LinkedHashMap<String, ChildState> {
+        val map = LinkedHashMap<String, ChildState>()
+        children.forEach { map[it.documentId] = it }
         return map
     }
 
     private fun events(vararg children: Pair<Int, String>) = children.toList()
 
-    private fun List<SnapshotDiffer.DiffEvent>.simplified() =
-        map { it.event to DocumentsContract.getDocumentId(it.document.uri) }
+    private fun List<DiffEvent>.simplified() =
+        map { it.event to it.child.documentId }
 
     // region no change
 
@@ -89,7 +73,7 @@ class SnapshotDifferTest {
     fun missingId_emitsDeleteWithLastKnownDocument() {
         val result = SnapshotDiffer.diff(snapshotOf(child("a"), child("b")), snapshotOf(child("a")))
         assertEquals(events(DirectoryObserver.DELETE to "b"), result.simplified())
-        assertEquals("b.txt", result.single().document.name)
+        assertEquals("b.txt", result.single().child.name)
     }
 
     @Test
@@ -143,8 +127,8 @@ class SnapshotDifferTest {
             events(DirectoryObserver.MOVED_FROM to "a", DirectoryObserver.MOVED_TO to "a"),
             result.simplified()
         )
-        assertEquals("old.txt", result[0].document.name)
-        assertEquals("new.txt", result[1].document.name)
+        assertEquals("old.txt", result[0].child.name)
+        assertEquals("new.txt", result[1].child.name)
     }
 
     @Test

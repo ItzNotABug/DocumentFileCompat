@@ -11,13 +11,15 @@ import com.lazygeniouz.dfc.file.DocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import com.lazygeniouz.dfc.logger.ErrorLogger
+import com.lazygeniouz.dfc.observer.internal.snapshot.ChildState
+import com.lazygeniouz.dfc.observer.internal.snapshot.SnapshotScan
 
 /**
  * Helper class for calling relevant methods on [DocumentsContract] & queries via [ContentResolver].
  */
 internal object ResolverCompat {
 
-    private val iconProjection = arrayOf(Document.COLUMN_ICON)
+    internal val notificationProjection = arrayOf(Document.COLUMN_ICON)
     private val idProjection = arrayOf(Document.COLUMN_DOCUMENT_ID)
     val fullProjection = arrayOf(
         Document.COLUMN_DOCUMENT_ID,
@@ -97,7 +99,7 @@ internal object ResolverCompat {
         return getCursor(
             context,
             childrenUri,
-            iconProjection
+            notificationProjection
         )?.use { cursor -> return cursor.count } ?: 0
     }
 
@@ -145,36 +147,59 @@ internal object ResolverCompat {
         val listOfDocuments = arrayListOf<DocumentFileCompat>()
         if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
 
-        forEachChild(context, cursor, parent, emptyMap(), null, strictIds = false) { _, child ->
-            listOfDocuments.add(child)
+        forEachChildRow(cursor, null, strictIds = false) {
+                documentId, name, size, lastModified, mimeType, flags ->
+            listOfDocuments.add(
+                buildChild(
+                    context, parent, documentId, name,
+                    size, lastModified, mimeType, flags
+                )
+            )
         }
         return listOfDocuments
     }
 
     /**
      * Reads an observer snapshot directly into a map keyed by document id. Unchanged rows reuse
-     * their previous [DocumentFileCompat] instance; malformed or duplicate ids reject the entire
-     * scan so malformed rows cannot be interpreted as deletions.
+     * their previous compact state; malformed or duplicate ids reject the entire scan so malformed
+     * rows cannot be interpreted as deletions.
      */
     internal fun readChildSnapshot(
-        context: Context,
         cursor: Cursor,
-        parent: DocumentFileCompat,
-        reusable: Map<String, DocumentFileCompat>,
+        reusable: Map<String, ChildState>,
         cancellationSignal: CancellationSignal,
-    ): LinkedHashMap<String, DocumentFileCompat> {
+        trackCreations: Boolean,
+    ): SnapshotScan {
         cancellationSignal.throwIfCanceled()
         val itemCount = cursor.count
         cancellationSignal.throwIfCanceled()
-        val snapshot = LinkedHashMap<String, DocumentFileCompat>(mapCapacity(itemCount))
-        forEachChild(
-            context, cursor, parent, reusable, cancellationSignal, strictIds = true
-        ) { documentId, child ->
-            check(snapshot.put(documentId, child) == null) {
+        val snapshot = LinkedHashMap<String, ChildState>(mapCapacity(itemCount))
+        val creations = if (trackCreations) ArrayList<ChildState>() else null
+        forEachChildRow(cursor, cancellationSignal, strictIds = true) {
+                documentId, name, size, lastModified, mimeType, flags ->
+            val previous = reusable[documentId]
+            val child = if (previous != null && previous.matches(
+                    name, size, lastModified, mimeType, flags
+                )
+            ) {
+                previous
+            } else {
+                ChildState(
+                    previous?.documentId ?: documentId,
+                    if (previous?.name == name) previous.name else name,
+                    size,
+                    lastModified,
+                    if (previous?.mimeType == mimeType) previous.mimeType else mimeType,
+                    flags,
+                )
+            }
+
+            check(snapshot.put(child.documentId, child) == null) {
                 "Directory query returned duplicate document id: $documentId"
             }
+            if (previous == null) creations?.add(child)
         }
-        return snapshot
+        return SnapshotScan(snapshot, creations ?: emptyList())
     }
 
     /** Query the watched document itself when an empty child cursor cannot prove it still exists. */
@@ -198,31 +223,30 @@ internal object ResolverCompat {
         }
     }
 
-    /** Event payloads must not expose the mutable objects retained by the internal snapshot. */
-    internal fun copyForCallback(document: DocumentFileCompat): DocumentFileCompat {
-        val copy: DocumentFileCompat = if (document.documentMimeType == Document.MIME_TYPE_DIR) {
-            TreeDocumentFileCompat(
-                document.context, document.uri, document.name, document.length,
-                document.lastModified, document.documentMimeType, document.documentFlags,
-            )
-        } else {
-            SingleDocumentFileCompat(
-                document.context, document.uri, document.name, document.length,
-                document.lastModified, document.documentMimeType, document.documentFlags,
-            )
-        }
-        copy.parentFile = document.parentFile
-        return copy
+    /** Materializes a detached callback document from compact observer state. */
+    internal fun materializeChild(
+        context: Context,
+        parent: DocumentFileCompat,
+        child: ChildState,
+    ): DocumentFileCompat {
+        return buildChild(
+            context, parent, child.documentId, child.name, child.length,
+            child.lastModified, child.mimeType, child.flags,
+        )
     }
 
-    private inline fun forEachChild(
-        context: Context,
+    private inline fun forEachChildRow(
         cursor: Cursor,
-        parent: DocumentFileCompat,
-        reusable: Map<String, DocumentFileCompat>,
         cancellationSignal: CancellationSignal?,
         strictIds: Boolean,
-        onChild: (documentId: String, child: DocumentFileCompat) -> Unit,
+        onChild: (
+            documentId: String,
+            name: String,
+            size: Long,
+            lastModified: Long,
+            mimeType: String,
+            flags: Int,
+        ) -> Unit,
     ) {
         val idIndex = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
         val nameIndex = cursor.getColumnIndex(Document.COLUMN_DISPLAY_NAME)
@@ -254,34 +278,12 @@ internal object ResolverCompat {
              */
             val documentFlags = getLongOrDefault(cursor, flagsIndex, 0L).toInt()
 
-            val previous = reusable[documentId]
-            val child = if (previous != null && canReuse(
-                    previous, documentName, documentSize,
-                    lastModifiedTime, documentMimeType, documentFlags
-                )
-            ) {
-                previous
-            } else {
-                buildChild(
-                    context, parent, documentId, documentName,
-                    documentSize, lastModifiedTime, documentMimeType, documentFlags
-                )
-            }
-            onChild(documentId, child)
+            onChild(
+                documentId, documentName, documentSize,
+                lastModifiedTime, documentMimeType, documentFlags
+            )
         }
         cancellationSignal?.throwIfCanceled()
-    }
-
-    // Identical fields (flags included: capabilities may change without a diff event).
-    private fun canReuse(
-        previous: DocumentFileCompat,
-        name: String, size: Long, lastModified: Long, mimeType: String, flags: Int,
-    ): Boolean {
-        return previous.name == name
-                && previous.length == size
-                && previous.lastModified == lastModified
-                && previous.documentMimeType == mimeType
-                && previous.documentFlags == flags
     }
 
     // Builds the correctly typed document for a child row.

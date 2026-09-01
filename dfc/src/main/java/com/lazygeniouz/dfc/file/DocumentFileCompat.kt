@@ -11,7 +11,6 @@ import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
 import com.lazygeniouz.dfc.observer.DirectoryEventMask
 import com.lazygeniouz.dfc.observer.DirectoryObserver
-import com.lazygeniouz.dfc.observer.DirectoryWatcher
 import java.io.File
 
 /**
@@ -229,7 +228,7 @@ abstract class DocumentFileCompat(
             "The mask must contain only supported observer events."
         }
 
-        return DirectoryObserver(DirectoryWatcher(this, mask, listener))
+        return DirectoryObserver.create(this, mask, listener)
     }
 
     companion object {
