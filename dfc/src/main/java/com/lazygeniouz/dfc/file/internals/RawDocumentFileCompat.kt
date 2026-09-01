@@ -115,7 +115,7 @@ internal class RawDocumentFileCompat(context: Context, var file: File) :
     /**
      * This will return the children count in the directory.
      *
-     * [File] api is usually fast but may slow down if there are a lot of children in the directory..
+     * [File] api is usually fast but may slow down if there are a lot of children in the directory.
      *
      */
     override fun count(): Int {
@@ -135,7 +135,7 @@ internal class RawDocumentFileCompat(context: Context, var file: File) :
         file.inputStream().use { inputStream -> inputStream.copyTo(outPutStream) }
     }
 
-    // Copies current source file at current uri's location.
+    // Copies current source file at current Uri's location.
     override fun copyFrom(source: Uri) {
         val inputStream = context.contentResolver.openInputStream(source)!!
         inputStream.use { stream -> stream.copyTo(file.outputStream()) }

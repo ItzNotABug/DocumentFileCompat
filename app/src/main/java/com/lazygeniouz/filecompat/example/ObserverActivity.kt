@@ -30,6 +30,7 @@ import java.text.SimpleDateFormat
 import java.util.ArrayDeque
 import java.util.Date
 import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Interactive, real-provider sample for [DocumentFileCompat.observe]. */
 class ObserverActivity : AppCompatActivity(R.layout.activity_observer) {
@@ -287,7 +288,7 @@ class ObserverActivity : AppCompatActivity(R.layout.activity_observer) {
                 } ?: throw IOException("The provider did not create the demo file")
                 appendSystemLine(getString(R.string.observer_demo_created, originalName))
 
-                delay(DEMO_STEP_DELAY_MS)
+                delay(DEMO_STEP_DELAY_MS.milliseconds)
                 withContext(Dispatchers.IO) {
                     contentResolver.openOutputStream(document.uri, "wt")?.use { stream ->
                         stream.write("Modified by the FileCompat observer demo\n".toByteArray())
@@ -295,7 +296,7 @@ class ObserverActivity : AppCompatActivity(R.layout.activity_observer) {
                 }
                 appendSystemLine(getString(R.string.observer_demo_modified, originalName))
 
-                delay(DEMO_STEP_DELAY_MS)
+                delay(DEMO_STEP_DELAY_MS.milliseconds)
                 val renamed = withContext(Dispatchers.IO) {
                     document.renameTo(renamedName)
                 }
@@ -304,7 +305,7 @@ class ObserverActivity : AppCompatActivity(R.layout.activity_observer) {
                     else getString(R.string.observer_demo_rename_unsupported)
                 )
 
-                delay(DEMO_STEP_DELAY_MS)
+                delay(DEMO_STEP_DELAY_MS.milliseconds)
                 val deleted = withContext(Dispatchers.IO) { document.delete() }
                 if (!deleted) throw IOException("The provider did not delete the demo file")
                 demoDeleted = true
