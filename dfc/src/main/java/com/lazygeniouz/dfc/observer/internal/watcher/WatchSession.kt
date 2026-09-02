@@ -46,9 +46,7 @@ internal class WatchSession(
 
     // Confined to [thread].
     var notificationCursor: Cursor? = null
-    var lightweightCursorInstalled = false
     var snapshot: LinkedHashMap<String, ChildState> = LinkedHashMap()
-    var baselineCaptured = false
     var ready = false
     var consecutiveRefreshFailures = 0
     var retryGeneration = 0L

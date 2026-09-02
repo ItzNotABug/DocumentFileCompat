@@ -70,19 +70,31 @@ class TestDocumentsProvider : DocumentsProvider() {
         val notificationOnly = columns.contentEquals(arrayOf(Document.COLUMN_ICON))
         val cursor = TrackingCursor(columns, loading, notificationOnly)
         openChildCursors.incrementAndGet()
-        if (notificationOnly) activeNotificationCursors.incrementAndGet()
-        else activeSnapshotCursors.incrementAndGet()
+        if (notificationOnly) {
+            notificationChildQueries.incrementAndGet()
+            activeNotificationCursors.incrementAndGet()
+        } else {
+            snapshotChildQueries.incrementAndGet()
+            activeSnapshotCursors.incrementAndGet()
+        }
 
         val children = fileFor(parentDocumentId).listFiles()?.sortedBy { it.name }.orEmpty()
         val visibleChildren = if (loading) children.take(loadingChildLimit) else children
         visibleChildren.forEach { child ->
             include(cursor, "$parentDocumentId/${child.name}", child)
         }
+        if (notificationOnly) {
+            notificationChildRows.addAndGet(visibleChildren.size)
+        } else {
+            snapshotChildRows.addAndGet(visibleChildren.size)
+        }
         cursor.setNotificationUri(
             context!!.contentResolver, childrenUriOf(parentDocumentId)
         )
-        childSnapshotCaptured?.countDown()
-        childQueryReturnGate?.await(10, TimeUnit.SECONDS)
+        if (!notificationOnly) {
+            childSnapshotCaptured?.countDown()
+            childQueryReturnGate?.await(10, TimeUnit.SECONDS)
+        }
         return cursor
     }
 
@@ -232,6 +244,10 @@ class TestDocumentsProvider : DocumentsProvider() {
         val failNextChildQueries = AtomicInteger(0)
         val openChildCursors = AtomicInteger(0)
         val closedChildCursors = AtomicInteger(0)
+        val notificationChildQueries = AtomicInteger(0)
+        val snapshotChildQueries = AtomicInteger(0)
+        val notificationChildRows = AtomicInteger(0)
+        val snapshotChildRows = AtomicInteger(0)
         val activeNotificationCursors = AtomicInteger(0)
         val activeSnapshotCursors = AtomicInteger(0)
 

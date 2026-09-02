@@ -209,12 +209,8 @@ class ObserverResilienceTest {
     }
 
     @Test
-    fun startupReconciliationFailure_neverReportsReady() {
-        val snapshotCaptured = CountDownLatch(1)
-        val returnGate = CountDownLatch(1)
-        TestDocumentsProvider.childSnapshotCaptured = snapshotCaptured
-        TestDocumentsProvider.childQueryReturnGate = returnGate
-
+    fun startupBaselineFailure_neverReportsReady() {
+        TestDocumentsProvider.failChildQueryAt = TestDocumentsProvider.childQueryCount.get() + 2
         val started = observe()
         val completed = CountDownLatch(1)
         val becameReady = AtomicBoolean(false)
@@ -230,21 +226,54 @@ class ObserverResilienceTest {
             },
         )
 
-        assertTrue("Initial snapshot was not captured", snapshotCaptured.await(5, TimeUnit.SECONDS))
-        createFile("blind-window.txt")
-        notifyChildren() // No observer is registered yet; this notification is deliberately lost.
-        // The next query installs the lightweight cursor; fail the full reconciliation after it.
-        TestDocumentsProvider.failChildQueryAt = TestDocumentsProvider.childQueryCount.get() + 2
+        assertTrue("Startup did not terminate", completed.await(5, TimeUnit.SECONDS))
+        assertFalse("A failed baseline was reported ready", becameReady.get())
+        assertTrue(failure.get() is IllegalStateException)
+        awaitObserverThreadGone()
+        awaitAllChildCursorsClosed()
+    }
+
+    @Test
+    fun startupScansChildrenTwice_withOneFullSnapshot() {
+        repeat(3) { createFile("existing-$it.txt") }
+        val notificationQueries = TestDocumentsProvider.notificationChildQueries.get()
+        val snapshotQueries = TestDocumentsProvider.snapshotChildQueries.get()
+        val notificationRows = TestDocumentsProvider.notificationChildRows.get()
+        val snapshotRows = TestDocumentsProvider.snapshotChildRows.get()
+
+        startAndAwaitWatching(observe())
+
+        assertEquals(1, TestDocumentsProvider.notificationChildQueries.get() - notificationQueries)
+        assertEquals(1, TestDocumentsProvider.snapshotChildQueries.get() - snapshotQueries)
+        assertEquals(3, TestDocumentsProvider.notificationChildRows.get() - notificationRows)
+        assertEquals(3, TestDocumentsProvider.snapshotChildRows.get() - snapshotRows)
+        assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun mutationAfterStartupSnapshot_isDeliveredAfterReady() {
+        val snapshotCaptured = CountDownLatch(1)
+        val returnGate = CountDownLatch(1)
+        TestDocumentsProvider.childSnapshotCaptured = snapshotCaptured
+        TestDocumentsProvider.childQueryReturnGate = returnGate
+
+        val callbacks = LinkedBlockingQueue<String>()
+        val started = directory.observe { _, document ->
+            callbacks.add("event:${document.name}")
+        }.also { observer = it }
+        started.startWatching(onError = errors::add) { callbacks.add("ready") }
+
+        assertTrue("Startup snapshot was not captured", snapshotCaptured.await(5, TimeUnit.SECONDS))
+        createFile("during-startup.txt")
+        notifyChildren()
 
         returnGate.countDown()
         TestDocumentsProvider.childQueryReturnGate = null
         TestDocumentsProvider.childSnapshotCaptured = null
 
-        assertTrue("Startup did not terminate", completed.await(5, TimeUnit.SECONDS))
-        assertFalse("A stale baseline was reported ready", becameReady.get())
-        assertTrue(failure.get() is IllegalStateException)
-        awaitObserverThreadGone()
-        awaitAllChildCursorsClosed()
+        assertEquals("ready", callbacks.poll(5, TimeUnit.SECONDS))
+        assertEquals("event:during-startup.txt", callbacks.poll(5, TimeUnit.SECONDS))
+        assertTrue(errors.isEmpty())
     }
 
     @Test
@@ -272,7 +301,7 @@ class ObserverResilienceTest {
     }
 
     @Test
-    fun loadingCompletionBeforeRegistration_stillBecomesReady() {
+    fun loadingCompletionDuringBlockedBaseline_stillBecomesReady() {
         createFile("cached.txt")
         createFile("remote.txt")
         TestDocumentsProvider.returnLoadingChildren = true
@@ -334,6 +363,29 @@ class ObserverResilienceTest {
         awaitAllChildCursorsClosed()
         assertEquals(0, TestDocumentsProvider.activeNotificationCursors.get())
         assertEquals(0, TestDocumentsProvider.activeSnapshotCursors.get())
+    }
+
+    @Test
+    fun refreshReleasesSnapshotCursor_beforeListenerRuns() {
+        val listenerEntered = CountDownLatch(1)
+        val releaseListener = CountDownLatch(1)
+        val activeSnapshotCursors = AtomicInteger(-1)
+        val started = directory.observe { _, _ ->
+            activeSnapshotCursors.set(TestDocumentsProvider.activeSnapshotCursors.get())
+            listenerEntered.countDown()
+            releaseListener.await(5, TimeUnit.SECONDS)
+        }.also { observer = it }
+        startAndAwaitWatching(started)
+
+        createFile("callback.txt")
+        notifyChildren()
+
+        try {
+            assertTrue("Listener did not run", listenerEntered.await(5, TimeUnit.SECONDS))
+            assertEquals(0, activeSnapshotCursors.get())
+        } finally {
+            releaseListener.countDown()
+        }
     }
 
     @Test
