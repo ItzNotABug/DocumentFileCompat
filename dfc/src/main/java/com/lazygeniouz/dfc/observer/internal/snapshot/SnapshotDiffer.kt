@@ -76,7 +76,8 @@ internal object SnapshotDiffer {
                 if (mask includes DirectoryObserver.MOVED_TO) {
                     changes.add(DiffEvent(DirectoryObserver.MOVED_TO, newChild))
                 }
-            } else if (
+            }
+            if (
                 mask includes DirectoryObserver.MODIFY && oldChild.isModified(newChild)
             ) {
                 changes.add(DiffEvent(DirectoryObserver.MODIFY, newChild))

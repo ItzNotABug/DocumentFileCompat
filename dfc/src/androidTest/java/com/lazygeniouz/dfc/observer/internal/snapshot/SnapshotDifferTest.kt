@@ -132,16 +132,31 @@ class SnapshotDifferTest {
     }
 
     @Test
-    fun renamePlusMetadataChange_emitsOnlyTheMovePair() {
+    fun renamePlusMetadataChange_emitsMovePairAndModify() {
         val result = SnapshotDiffer.diff(
             snapshotOf(child("a", name = "old.txt", size = 10L, lastModified = 100L)),
             snapshotOf(child("a", name = "new.txt", size = 99L, lastModified = 999L)),
         )
 
         assertEquals(
-            events(DirectoryObserver.MOVED_FROM to "a", DirectoryObserver.MOVED_TO to "a"),
+            events(
+                DirectoryObserver.MOVED_FROM to "a",
+                DirectoryObserver.MOVED_TO to "a",
+                DirectoryObserver.MODIFY to "a",
+            ),
             result.simplified()
         )
+    }
+
+    @Test
+    fun renamePlusMetadataChange_withModifyOnly_emitsModify() {
+        val result = SnapshotDiffer.diff(
+            snapshotOf(child("a", name = "old.txt", size = 10L)),
+            snapshotOf(child("a", name = "new.txt", size = 20L)),
+            DirectoryObserver.MODIFY,
+        )
+
+        assertEquals(events(DirectoryObserver.MODIFY to "a"), result.simplified())
     }
 
     @Test
