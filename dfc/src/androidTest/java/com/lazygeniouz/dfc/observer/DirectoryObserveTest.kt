@@ -3,6 +3,7 @@ package com.lazygeniouz.dfc.observer
 import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import android.provider.DocumentsContract
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -117,23 +118,33 @@ class DirectoryObserveTest {
         Thread.getAllStackTraces().keys.any { it.name == "dfc-observer" && it.isAlive }
 
     private fun awaitObserverThreadGone(timeoutMs: Long = 5000) {
-        val deadline = System.currentTimeMillis() + timeoutMs
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
         while (observerThreadAlive()) {
-            if (System.currentTimeMillis() >= deadline) fail("Observer worker thread was not released")
+            if (SystemClock.elapsedRealtime() >= deadline) fail("Observer worker thread was not released")
             Thread.sleep(25)
         }
     }
 
     private fun awaitAllChildCursorsClosed(timeoutMs: Long = 5000) {
-        val deadline = System.currentTimeMillis() + timeoutMs
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
         while (true) {
             val opened = TestDocumentsProvider.openChildCursors.get() - openedCursorBaseline
             val closed = TestDocumentsProvider.closedChildCursors.get() - closedCursorBaseline
             if (opened == closed) return
-            if (System.currentTimeMillis() >= deadline) {
+            if (SystemClock.elapsedRealtime() >= deadline) {
                 fail("Leaked child cursors: opened $opened, closed $closed")
             }
             Thread.sleep(25)
+        }
+    }
+
+    private fun awaitBlocked(thread: Thread, timeoutMs: Long = 5000) {
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
+        while (thread.state != Thread.State.BLOCKED) {
+            if (SystemClock.elapsedRealtime() >= deadline) {
+                fail("Thread did not reach callback barrier")
+            }
+            Thread.sleep(10)
         }
     }
 
@@ -314,6 +325,49 @@ class DirectoryObserveTest {
         notifyChildren()
         Thread.sleep(300)
         assertEquals(1, callbacks.get())
+    }
+
+    @Test
+    fun concurrentStops_bothWaitForAdmittedCallback() {
+        val callbackEntered = CountDownLatch(1)
+        val releaseCallback = CountDownLatch(1)
+        val firstReturned = CountDownLatch(1)
+        val secondReturned = CountDownLatch(1)
+        val blocking = directory.observe { _, _ ->
+            callbackEntered.countDown()
+            releaseCallback.await(5, TimeUnit.SECONDS)
+        }.also { observer = it }
+        startAndAwaitWatching(blocking)
+
+        createFile("two-stoppers.txt")
+        notifyChildren()
+        assertTrue("Listener was not admitted", callbackEntered.await(5, TimeUnit.SECONDS))
+
+        val first = Thread {
+            blocking.stopWatching()
+            firstReturned.countDown()
+        }.apply { start() }
+
+        var second: Thread? = null
+        try {
+            awaitBlocked(first)
+            second = Thread {
+                blocking.stopWatching()
+                secondReturned.countDown()
+            }.apply { start() }
+
+            assertFalse(
+                "Concurrent stop returned while the callback was running",
+                secondReturned.await(200, TimeUnit.MILLISECONDS),
+            )
+        } finally {
+            releaseCallback.countDown()
+        }
+
+        assertTrue("First stop did not return", firstReturned.await(5, TimeUnit.SECONDS))
+        assertTrue("Second stop did not return", secondReturned.await(5, TimeUnit.SECONDS))
+        first.join(5000)
+        second?.join(5000)
     }
 
     @Test

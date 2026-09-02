@@ -18,6 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -406,7 +407,7 @@ class ObserverResilienceTest {
         createFile("missed.txt")
         notifyChildren()
         awaitCounterAbove(TestDocumentsProvider.failedChildQueries, failedBaseline)
-        assertNull(events.poll(250, TimeUnit.MILLISECONDS))
+        assertTrue(events.isEmpty())
 
         TestDocumentsProvider.failChildQueries = false
         createFile("caught.txt")
@@ -438,7 +439,7 @@ class ObserverResilienceTest {
     }
 
     @Test
-    fun nullRefreshCursor_isRecoverableAndReconcilesMissedChanges() {
+    fun nullRefreshCursor_retryExhaustionIsTerminalAndAllowsRestart() {
         startAndAwaitWatching(observe())
 
         val nullBaseline = TestDocumentsProvider.nullChildQueries.get()
@@ -447,21 +448,24 @@ class ObserverResilienceTest {
         notifyChildren()
 
         awaitCounterDelta(TestDocumentsProvider.nullChildQueries, nullBaseline, 2)
-        assertTrue(errors.isEmpty())
-        assertTrue(observerThreadAlive())
-        assertNull(events.poll(250, TimeUnit.MILLISECONDS))
+        assertTrue(errors.poll(5, TimeUnit.SECONDS) is IOException)
+        awaitObserverThreadGone()
+        awaitAllChildCursorsClosed()
+        assertTrue(events.isEmpty())
 
         TestDocumentsProvider.returnNullChildQueries = false
+        startAndAwaitWatching(observer!!)
+        createFile("after-null-cursor.txt")
         notifyChildren()
 
         assertEquals(
-            DirectoryObserver.CREATE to "missed-null-cursor.txt",
+            DirectoryObserver.CREATE to "after-null-cursor.txt",
             requireEvent(),
         )
     }
 
     @Test
-    fun nullDirectoryCheckCursor_isRecoverable() {
+    fun nullDirectoryCheckCursor_retryExhaustionIsTerminalAndAllowsRestart() {
         startAndAwaitWatching(observe())
 
         val nullBaseline = TestDocumentsProvider.nullDocumentQueries.get()
@@ -469,10 +473,12 @@ class ObserverResilienceTest {
         notifyChildren()
 
         awaitCounterDelta(TestDocumentsProvider.nullDocumentQueries, nullBaseline, 2)
-        assertTrue(errors.isEmpty())
-        assertTrue(observerThreadAlive())
+        assertTrue(errors.poll(5, TimeUnit.SECONDS) is IOException)
+        awaitObserverThreadGone()
+        awaitAllChildCursorsClosed()
 
         TestDocumentsProvider.returnNullDocumentQueries = false
+        startAndAwaitWatching(observer!!)
         createFile("after-null-directory-check.txt")
         notifyChildren()
 
@@ -667,6 +673,41 @@ class ObserverResilienceTest {
         assertNull(events.poll(500, TimeUnit.MILLISECONDS))
         awaitObserverThreadGone()
         awaitAllChildCursorsClosed()
+    }
+
+    @Test
+    fun restartAfterSelfStop_doesNotWaitForBlockedTeardown() {
+        val callbackReturned = CountDownLatch(1)
+        val closeStarted = CountDownLatch(1)
+        val closeGate = CountDownLatch(1)
+        lateinit var selfStopping: DirectoryObserver
+        selfStopping = directory.observe { _, _ ->
+            TestDocumentsProvider.childCursorCloseStarted = closeStarted
+            TestDocumentsProvider.childCursorCloseGate = closeGate
+            selfStopping.stopWatching()
+            callbackReturned.countDown()
+        }.also { observer = it }
+        startAndAwaitWatching(selfStopping)
+
+        createFile("self-stop.txt")
+        notifyChildren()
+        assertTrue("Self-stop did not return", callbackReturned.await(5, TimeUnit.SECONDS))
+        assertTrue("Old teardown did not begin", closeStarted.await(5, TimeUnit.SECONDS))
+
+        val restartQueryBaseline = TestDocumentsProvider.childQueryCount.get()
+        val restarted = CountDownLatch(1)
+        try {
+            selfStopping.startWatching(onError = errors::add, onReady = restarted::countDown)
+            awaitQueryCountAbove(restartQueryBaseline)
+            assertFalse("Restart completed through blocked cleanup", restarted.await(200, TimeUnit.MILLISECONDS))
+        } finally {
+            closeGate.countDown()
+            TestDocumentsProvider.childCursorCloseGate = null
+            TestDocumentsProvider.childCursorCloseStarted = null
+        }
+
+        assertTrue("Restart did not finish", restarted.await(5, TimeUnit.SECONDS))
+        assertTrue(errors.isEmpty())
     }
 
     @Test

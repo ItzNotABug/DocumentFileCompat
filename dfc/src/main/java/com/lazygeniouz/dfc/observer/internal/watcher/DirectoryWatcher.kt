@@ -39,6 +39,9 @@ internal class DirectoryWatcher(
     // Writes are guarded by [lock]; volatile reads make stale sessions no-op.
     private var session: WatchSession? = null
 
+    // Keeps the callback barrier visible to concurrent stop calls.
+    private var stoppingSession: WatchSession? = null
+
     // A terminal session remains visible until its onError callback is completed or suppressed.
     private var terminatingSession: WatchSession? = null
 
@@ -50,7 +53,7 @@ internal class DirectoryWatcher(
         onReady: () -> Unit,
     ) {
         synchronized(lock) {
-            if (session != null || terminatingSession != null) return
+            if (session != null || stoppingSession != null || terminatingSession != null) return
             val started = WatchSession(::scheduleRefresh, onError, onReady)
             session = started
             started.handler.post { initialize(started) }
@@ -66,9 +69,10 @@ internal class DirectoryWatcher(
             if (active != null) {
                 stopped = active
                 session = null
+                stoppingSession = active
                 teardownRequired = true
             } else {
-                stopped = terminatingSession ?: return
+                stopped = stoppingSession ?: terminatingSession ?: return
                 teardownRequired = false
             }
             stopped.suppressTerminalCallback.set(true)
@@ -77,10 +81,19 @@ internal class DirectoryWatcher(
         // An admitted callback finishes before stop returns; a pending terminal callback is skipped.
         synchronized(stopped.callbackLock) {}
         if (teardownRequired) {
-            stopped.handler.post { teardown(stopped) }
-        } else {
-            // The old worker may still be cleaning up, but can no longer call user code.
+            stopped.handler.post {
+                // Reaching this message proves a self-stopping callback has returned.
+                synchronized(lock) {
+                    if (stoppingSession === stopped) stoppingSession = null
+                }
+                teardown(stopped)
+            }
+        }
+
+        // A self-stop leaves the barrier until the worker advances past its callback.
+        if (Looper.myLooper() !== stopped.handler.looper) {
             synchronized(lock) {
+                if (stoppingSession === stopped) stoppingSession = null
                 if (terminatingSession === stopped) terminatingSession = null
             }
         }
@@ -133,7 +146,7 @@ internal class DirectoryWatcher(
         } catch (cancelled: OperationCanceledException) {
             if (session.isCurrent) {
                 if (session.ready) {
-                    logTransientFailure(session, "Directory refresh was cancelled", cancelled)
+                    handleRefreshFailure(session, "Directory refresh was cancelled", cancelled)
                 } else {
                     ErrorLogger.logError("Directory observer initialization was cancelled", cancelled)
                     stopSelf(session, cancelled)
@@ -147,7 +160,7 @@ internal class DirectoryWatcher(
             stopSelf(session, unavailable)
         } catch (exception: Exception) {
             if (session.ready) {
-                logTransientFailure(session, "Directory refresh failed", exception)
+                handleRefreshFailure(session, "Directory refresh failed", exception)
             } else {
                 ErrorLogger.logError("Could not initialize the directory observer", exception)
                 stopSelf(session, exception)
@@ -298,14 +311,19 @@ internal class DirectoryWatcher(
         }
     }
 
-    private fun logTransientFailure(
+    private fun handleRefreshFailure(
         session: WatchSession,
         message: String,
         failure: Exception,
     ) {
-        val retryScheduled = scheduleRetryAfterFailure(session)
-        val outcome = if (retryScheduled) "retrying once" else "waiting for the next change"
-        ErrorLogger.logError("$message; $outcome", failure)
+        if (!session.isCurrent) return
+        if (scheduleRetryAfterFailure(session)) {
+            ErrorLogger.logError("$message; retrying once", failure)
+            return
+        }
+
+        ErrorLogger.logError("$message; retry exhausted, observer is stopped", failure)
+        stopSelf(session, failure)
     }
 
     private fun scheduleRetryAfterFailure(session: WatchSession): Boolean {
