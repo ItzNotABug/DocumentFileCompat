@@ -89,11 +89,11 @@ observer.startWatching(
 observer.close()
 ```
 
-Existing children do not produce events. `onReady` marks the point after which mutations are
-observable, and terminal initialization, permission, or directory failures use `onError`.
-Close it with the owning lifecycle. Observation is provider-driven and snapshot-based, so providers
-must publish change notifications, each refresh is Θ(children), bursts may coalesce, and
-partial/loading results are ignored until complete. One transient refresh retry is attempted.
+Files found during the initial scan aren't emitted. `onReady` runs after that scan, and `onError`
+reports why watching stopped. Close the observer with its owning lifecycle.
+
+Observation depends on provider change notifications. Each refresh scans all direct children, and
+rapid changes may be combined.
 
 ## Performance
 
