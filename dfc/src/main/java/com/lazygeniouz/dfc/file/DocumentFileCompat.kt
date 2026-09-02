@@ -9,6 +9,8 @@ import com.lazygeniouz.dfc.controller.DocumentController
 import com.lazygeniouz.dfc.file.internals.RawDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.SingleDocumentFileCompat
 import com.lazygeniouz.dfc.file.internals.TreeDocumentFileCompat
+import com.lazygeniouz.dfc.observer.DirectoryEventMask
+import com.lazygeniouz.dfc.observer.DirectoryObserver
 import java.io.File
 
 /**
@@ -195,11 +197,38 @@ abstract class DocumentFileCompat(
     }
 
     /**
-     * Converts a non serializable [DocumentFileCompat] to a serializable [SerializedFile].
+     * Converts a non-serializable [DocumentFileCompat] to a serializable [SerializedFile].
      */
     @Suppress("MemberVisibilityCanBePrivate")
     fun serialize(): SerializedFile {
         return SerializedFile.from(this)
+    }
+
+    /**
+     * Creates a stopped [DirectoryObserver] for this SAF directory's direct children.
+     *
+     * Existing children emit no events. Changes may coalesce between provider notifications,
+     * and callbacks run on a worker thread with detached document snapshots.
+     *
+     * @param mask Bitwise OR of the events to receive, [DirectoryObserver.ALL_EVENTS] by default.
+     * @throws UnsupportedOperationException if this is not a SAF-backed directory.
+     * @throws IllegalArgumentException if [mask] is empty or contains an unsupported event.
+     */
+    fun observe(
+        @DirectoryEventMask mask: Int = DirectoryObserver.ALL_EVENTS,
+        listener: (event: Int, document: DocumentFileCompat) -> Unit,
+    ): DirectoryObserver {
+        if (this !is TreeDocumentFileCompat || !isDirectory()) {
+            throw UnsupportedOperationException(
+                "observe() requires a directory backed by a SAF tree uri."
+            )
+        }
+
+        require(mask != 0 && (mask and DirectoryObserver.ALL_EVENTS) == mask) {
+            "The mask must contain only supported observer events."
+        }
+
+        return DirectoryObserver.create(this, mask, listener)
     }
 
     companion object {

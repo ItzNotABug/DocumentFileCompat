@@ -21,6 +21,7 @@ do not keep paying for the same queries again and again.
 - Raw `File` access via `fromFile(...)`.
 - Common `DocumentFile`-style methods and getters.
 - Faster directory listing and metadata access.
+- Event-driven observation of a directory's direct children.
 - Custom projections for lighter queries.
 - Convenience APIs like `count()`, `copyTo(destination)`, and `copyFrom(source)`.
 
@@ -69,6 +70,32 @@ Other entry points:
 
 Additional helpers like `count()`, `copyTo(destination)`, `copyFrom(source)`, and
 `listFiles(projection)` are available when you need them.
+
+### Observe a directory
+
+`observe()` watches the direct children of a SAF tree directory without polling:
+
+```kotlin
+val observer = directory.observe { event, document ->
+    println("$event: ${document.name}")
+}
+
+observer.startWatching(
+    onError = { error -> println("Observation stopped: $error") },
+    onReady = { println("Initial snapshot is ready") },
+)
+
+// Later, from the owning lifecycle:
+observer.close()
+```
+
+Files found during the initial scan aren't emitted. `onReady` runs after that scan, and `onError`
+reports why watching stopped. Callbacks run on a worker thread; close the observer with its
+lifecycle.
+
+Observation depends on provider change notifications. Each refresh scans all direct children, and
+rapid changes may be combined. Move events require stable document IDs; otherwise renames arrive as
+delete and create events, which rename tracking should also handle.
 
 ## Performance
 
