@@ -42,4 +42,4 @@ jobs:
           cache: "gradle"
 
       - name: Build project
-        run: ./gradlew :dfc:assemble :app:assembleDebug
+        run: ./gradlew :dfc:assemble :dfc:assembleDebugAndroidTest :app:assembleDebug
