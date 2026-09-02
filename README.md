@@ -90,10 +90,12 @@ observer.close()
 ```
 
 Files found during the initial scan aren't emitted. `onReady` runs after that scan, and `onError`
-reports why watching stopped. Close the observer with its owning lifecycle.
+reports why watching stopped. Callbacks run on a worker thread; close the observer with its
+lifecycle.
 
 Observation depends on provider change notifications. Each refresh scans all direct children, and
-rapid changes may be combined.
+rapid changes may be combined. Move events require stable document IDs; otherwise renames arrive as
+delete and create events, which rename tracking should also handle.
 
 ## Performance
 

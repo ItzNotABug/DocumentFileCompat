@@ -8,6 +8,7 @@ import java.io.Closeable
 /**
  * A direct-child observation created by [com.lazygeniouz.dfc.file.DocumentFileCompat.observe].
  * Starting and stopping are idempotent and thread-safe; [stopWatching] is safe inside callbacks.
+ * Close it with the owning lifecycle.
  */
 class DirectoryObserver private constructor(
     directory: DocumentFileCompat,
@@ -19,8 +20,8 @@ class DirectoryObserver private constructor(
 
     /**
      * Starts watching. [onReady] follows a successful baseline; [onError] reports terminal
-     * startup, permission, or directory failures. Starts are ignored while active or until a
-     * terminal callback returns.
+     * startup, refresh, permission, or directory failures. Starts are ignored while active, while
+     * a stop drains a callback, or until a terminal callback returns.
      */
     fun startWatching(
         onError: (Throwable) -> Unit = {},
@@ -47,10 +48,10 @@ class DirectoryObserver private constructor(
         /** A child's size, last-modified time, or MIME type changed. */
         const val MODIFY = FileObserver.MODIFY
 
-        /** Same as [FileObserver.MOVED_FROM]: a child was renamed, carrying its old name. */
+        /** A rename's old state when its document ID stays stable; otherwise DELETE + CREATE. */
         const val MOVED_FROM = FileObserver.MOVED_FROM
 
-        /** Same as [FileObserver.MOVED_TO]: a child was renamed, carrying its new name. */
+        /** A rename's new state when its document ID stays stable; otherwise DELETE + CREATE. */
         const val MOVED_TO = FileObserver.MOVED_TO
 
         /** Same as [FileObserver.CREATE]: a child was created. */
