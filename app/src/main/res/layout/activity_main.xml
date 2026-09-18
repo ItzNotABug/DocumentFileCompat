@@ -43,4 +43,13 @@
         android:paddingVertical="12dp"
         android:text="@string/test_custom_projections" />
 
+    <Button
+        android:id="@+id/buttonObserver"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginVertical="12dp"
+        android:minHeight="48dp"
+        android:paddingVertical="12dp"
+        android:text="@string/observe_a_directory" />
+
 </LinearLayout>

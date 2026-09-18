@@ -11,6 +11,12 @@ object ErrorLogger {
      * Log error to the logcat to let the developer know if something went wrong.
      */
     internal fun logError(message: String, throwable: Throwable?) {
-        Log.e("DocumentFileCompat", "$message: ${throwable?.message}")
+        if (throwable == null) {
+            Log.e(TAG, message)
+        } else {
+            Log.e(TAG, message, throwable)
+        }
     }
+
+    private const val TAG = "DocumentFileCompat"
 }
