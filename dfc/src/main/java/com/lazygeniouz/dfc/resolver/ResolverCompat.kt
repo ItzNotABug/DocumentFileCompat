@@ -148,8 +148,11 @@ internal object ResolverCompat {
         val listOfDocuments = arrayListOf<DocumentFileCompat>()
         if (itemCount > 10) listOfDocuments.ensureCapacity(itemCount)
 
-        forEachChildRow(cursor, null, strictIds = false) {
-                documentId, name, size, lastModified, mimeType, flags ->
+        forEachChildRow(
+            cursor,
+            null,
+            strictIds = false
+        ) { documentId, name, size, lastModified, mimeType, flags ->
             listOfDocuments.add(
                 buildChild(
                     context, parent, documentId, name,
@@ -176,8 +179,11 @@ internal object ResolverCompat {
         cancellationSignal.throwIfCanceled()
         val snapshot = LinkedHashMap<String, ChildState>(mapCapacity(itemCount))
         val creations = if (trackCreations) ArrayList<ChildState>() else null
-        forEachChildRow(cursor, cancellationSignal, strictIds = true) {
-                documentId, name, size, lastModified, mimeType, flags ->
+        forEachChildRow(
+            cursor,
+            cancellationSignal,
+            strictIds = true
+        ) { documentId, name, size, lastModified, mimeType, flags ->
             val previous = reusable[documentId]
             val child = if (previous != null && previous.matches(
                     name, size, lastModified, mimeType, flags
@@ -270,7 +276,8 @@ internal object ResolverCompat {
 
             val documentName = getStringOrDefault(cursor, nameIndex)
             val documentSize = getLongOrDefault(cursor, sizeIndex)
-            val lastModifiedTime = getLongOrDefault(cursor, modifiedIndex, -1L)
+            val lastModifiedTime =
+                getLongOrDefault(cursor, modifiedIndex, ChildState.UNKNOWN_TIMESTAMP)
             val documentMimeType = getStringOrDefault(cursor, mimeIndex)
 
             /**
@@ -297,7 +304,15 @@ internal object ResolverCompat {
         val childFile: DocumentFileCompat = if (mimeType == Document.MIME_TYPE_DIR) {
             TreeDocumentFileCompat(context, documentUri, name, size, lastModified, mimeType, flags)
         } else {
-            SingleDocumentFileCompat(context, documentUri, name, size, lastModified, mimeType, flags)
+            SingleDocumentFileCompat(
+                context,
+                documentUri,
+                name,
+                size,
+                lastModified,
+                mimeType,
+                flags
+            )
         }
 
         childFile.parentFile = parent

@@ -112,6 +112,33 @@ class SnapshotDifferTest {
         assertTrue(result.isEmpty())
     }
 
+    @Test
+    fun unknownToKnownTimestamp_emitsNothing() {
+        val result = SnapshotDiffer.diff(
+            snapshotOf(child("a", lastModified = ChildState.UNKNOWN_TIMESTAMP)),
+            snapshotOf(child("a", lastModified = 200L)),
+        )
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun knownToUnknownTimestamp_emitsNothing() {
+        val result = SnapshotDiffer.diff(
+            snapshotOf(child("a", lastModified = 100L)),
+            snapshotOf(child("a", lastModified = ChildState.UNKNOWN_TIMESTAMP)),
+        )
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun unknownTimestampTransition_withSizeChange_stillEmitsModify() {
+        val result = SnapshotDiffer.diff(
+            snapshotOf(child("a", size = 10L, lastModified = ChildState.UNKNOWN_TIMESTAMP)),
+            snapshotOf(child("a", size = 20L, lastModified = 200L)),
+        )
+        assertEquals(events(DirectoryObserver.MODIFY to "a"), result.simplified())
+    }
+
     // endregion
 
     // region rename semantics

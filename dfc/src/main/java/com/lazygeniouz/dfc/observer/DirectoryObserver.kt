@@ -45,7 +45,7 @@ class DirectoryObserver private constructor(
             listener: (event: Int, document: DocumentFileCompat) -> Unit,
         ) = DirectoryObserver(directory, mask, listener)
 
-        /** A child's size, last-modified time, or MIME type changed. */
+        /** A child's size, last-modified time, or MIME type changed; unreported timestamps are ignored. */
         const val MODIFY = FileObserver.MODIFY
 
         /** A rename's old state when its document ID stays stable; otherwise DELETE + CREATE. */

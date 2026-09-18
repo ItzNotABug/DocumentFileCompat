@@ -28,11 +28,20 @@ internal class ChildState(
     }
 
     /**
-     * Name changes emit move events; flag-only changes emit no event.
+     * Name changes emit move events; flag-only changes and [UNKNOWN_TIMESTAMP]
+     * transitions emit no event.
      */
     fun isModified(other: ChildState): Boolean {
         return length != other.length
-                || lastModified != other.lastModified
                 || mimeType != other.mimeType
+                || (lastModified != other.lastModified
+                && lastModified != UNKNOWN_TIMESTAMP
+                && other.lastModified != UNKNOWN_TIMESTAMP)
+    }
+
+    internal companion object {
+
+        /** Marks a last-modified value the provider did not report. */
+        internal const val UNKNOWN_TIMESTAMP = -1L
     }
 }
