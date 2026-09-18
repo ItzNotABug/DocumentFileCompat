@@ -15,7 +15,7 @@ on:
       - "gradle/**"
       - "gradle.properties"
   push:
-    branches: [ master ]
+    branches: [ main ]
     paths:
       - "dfc/**"
       - "app/**"
