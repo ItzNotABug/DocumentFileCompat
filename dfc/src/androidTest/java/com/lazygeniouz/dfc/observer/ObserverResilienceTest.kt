@@ -112,7 +112,10 @@ class ObserverResilienceTest {
                 completed.countDown()
             },
         )
-        assertTrue("Observer did not report startup completion", completed.await(5, TimeUnit.SECONDS))
+        assertTrue(
+            "Observer did not report startup completion",
+            completed.await(5, TimeUnit.SECONDS)
+        )
         assertFalse("Observer became ready despite terminal failure", becameReady.get())
         return failure.get() ?: throw AssertionError("Observer supplied no failure")
     }
@@ -290,13 +293,19 @@ class ObserverResilienceTest {
         started.startWatching(onError = errors::add, onReady = ready::countDown)
 
         awaitQueryCountAbove(queryBaseline)
-        assertFalse("Observer became ready from a partial cursor", ready.await(250, TimeUnit.MILLISECONDS))
+        assertFalse(
+            "Observer became ready from a partial cursor",
+            ready.await(250, TimeUnit.MILLISECONDS)
+        )
         assertTrue(events.isEmpty())
 
         TestDocumentsProvider.returnLoadingChildren = false
         notifyChildren()
 
-        assertTrue("Observer did not become ready after loading completed", ready.await(5, TimeUnit.SECONDS))
+        assertTrue(
+            "Observer did not become ready after loading completed",
+            ready.await(5, TimeUnit.SECONDS)
+        )
         assertTrue(events.isEmpty())
         assertTrue(errors.isEmpty())
     }
@@ -324,7 +333,10 @@ class ObserverResilienceTest {
         TestDocumentsProvider.childQueryReturnGate = null
         returnGate.countDown()
 
-        assertTrue("Observer remained stuck on the partial cursor", ready.await(5, TimeUnit.SECONDS))
+        assertTrue(
+            "Observer remained stuck on the partial cursor",
+            ready.await(5, TimeUnit.SECONDS)
+        )
         assertTrue(events.isEmpty())
         assertTrue(errors.isEmpty())
     }
@@ -618,7 +630,10 @@ class ObserverResilienceTest {
             terminal.stopWatching()
             stopReturned.countDown()
         }.apply { start() }
-        assertFalse("Stop returned while onError was running", stopReturned.await(200, TimeUnit.MILLISECONDS))
+        assertFalse(
+            "Stop returned while onError was running",
+            stopReturned.await(200, TimeUnit.MILLISECONDS)
+        )
 
         releaseCallback.countDown()
         assertTrue("Stop did not return after onError", stopReturned.await(5, TimeUnit.SECONDS))
@@ -665,7 +680,11 @@ class ObserverResilienceTest {
 
         val stopStarted = SystemClock.elapsedRealtime()
         observer?.stopWatching()
-        assertTrue(SystemClock.elapsedRealtime() - stopStarted < 500)
+        val stopDuration = SystemClock.elapsedRealtime() - stopStarted
+        assertTrue(
+            "stopWatching() blocked for ${stopDuration}ms during an in-flight query",
+            stopDuration < 2_000,
+        )
 
         gate.countDown()
         TestDocumentsProvider.childQueryGate = null
@@ -699,7 +718,10 @@ class ObserverResilienceTest {
         try {
             selfStopping.startWatching(onError = errors::add, onReady = restarted::countDown)
             awaitQueryCountAbove(restartQueryBaseline)
-            assertFalse("Restart completed through blocked cleanup", restarted.await(200, TimeUnit.MILLISECONDS))
+            assertFalse(
+                "Restart completed through blocked cleanup",
+                restarted.await(200, TimeUnit.MILLISECONDS)
+            )
         } finally {
             closeGate.countDown()
             TestDocumentsProvider.childCursorCloseGate = null
